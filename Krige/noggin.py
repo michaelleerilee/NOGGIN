@@ -1,5 +1,11 @@
 #!/opt/local/bin/python
+"""
 
+Support functions for NOGGIN.
+
+ML Rilee, RSTLLC, mike@rilee.net for NASA/ACCESS-15/NOGGIN.
+
+"""
 import os
 import sys
 import matplotlib as mpl
@@ -471,6 +477,15 @@ class Test_bounding_box(unittest.TestCase):
     def test_ovelap_high_1(self):
         self.assertEqual(self.bb2.overlap(self.bb0), True)        
     
+###########################################################################
+
+def data_src_directory():
+    if('NOGGIN_DATA_SRC_DIRECTORY' in os.environ):
+        SRC_DIRECTORY_BASE=os.environ['NOGGIN_DATA_SRC_DIRECTORY']
+    else:
+        SRC_DIRECTORY_BASE='./'
+    return SRC_DIRECTORY_BASE
+        
 ###########################################################################
     
 

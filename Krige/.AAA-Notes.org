@@ -1,4 +1,10 @@
 
 
+* Environment Variables
+
+NOGGIN_DATA_SRC_DIRECTORY=/Users/mrilee/data/NOGGIN/
+
+PYTHONPATH=/Users/mrilee/Dropbox/NOGGIN/src/noggin-github-1/Krige
+
 * 2018-0416-2118-26-EDT Initial item
 

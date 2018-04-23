@@ -1,12 +1,18 @@
 #!/opt/local/bin/python
 
+"""
+Prepare a MODIS datafield for further processing using python tools. Provide a basic viewing capability.
+
+2018-0423-1352-44-EDT ML Rilee, RSTLLC, mike@rilee.net.
+"""
+
 import os
 import numpy as np
 from pyhdf.SD import SD, SDC
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
-from noggin import fig_generator
+from noggin import fig_generator, data_src_directory
 
 class MODIS_DataField():
     """Access a datafield in a MODIS file"""
@@ -87,6 +93,9 @@ class MODIS_DataField():
     def init_basemap(self,ax=None,wh_scale=(1.5,1.5)\
                          ,lat_center=None, lon_center=None
                          ):
+        """
+        Initialize basemap visualization.
+        """
         if lat_center is None:
             self.plot_lat_m_center = np.nanmean(self.latitude)
         else:
@@ -215,11 +224,18 @@ class MODIS_DataField():
 
 if __name__ == '__main__':
     fig_gen = fig_generator(1,1)
+
+    # if('NOGGIN_DATA_SRC_DIRECTORY' in os.environ):
+    #     SRC_DIRECTORY_BASE=os.environ['NOGGIN_DATA_SRC_DIRECTORY']
+    # else:
+    #     SRC_DIRECTORY_BASE='./'
+    # SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS/'
+    SRC_DIRECTORY=data_src_directory()+'MODIS/'
     
     test_modis_obj = MODIS_DataField(\
                                         datafilename='MYD05_L2.A2015304.2125.006.2015305175459.hdf'\
                                         ,datafieldname='Water_Vapor_Infrared'\
-                                        ,srcdirname='MODIS/'\
+                                        ,srcdirname=SRC_DIRECTORY\
                                         )
     test_modis_obj.colormesh(vmin=1.0,vmax=3.0\
                                  ,colorbar=True\
@@ -230,7 +246,7 @@ if __name__ == '__main__':
     test_modis_obj = MODIS_DataField(\
                                          datafilename='MOD05_L2.A2015304.1815.006.2015308155414.hdf'\
                                          ,datafieldname='Water_Vapor_Infrared'\
-                                         ,srcdirname='MODIS/'\
+                                         ,srcdirname=SRC_DIRECTORY\
                                          )
     test_modis_obj.colormesh(vmin=1.0,vmax=3.0)
 
