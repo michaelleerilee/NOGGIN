@@ -8,6 +8,8 @@ PYTHONPATH=/Users/mrilee/Dropbox/NOGGIN/src/noggin-github-1/Krige
 
 * Various notes
 
+** 2018-0423-2136 Verified old code ran, produced visusals on new linux platorm.
+
 ** Dependencies
 
 ** As of 2018-0423
