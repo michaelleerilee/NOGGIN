@@ -1,5 +1,4 @@
-#!/opt/local/bin/python
-
+#!/usr/bin/env python
 """
 Prepare a MODIS datafield for further processing using python tools. Provide a basic viewing capability.
 
@@ -220,8 +219,6 @@ class MODIS_DataField():
         return \
           np.ravel(self.data),np.ravel(self.latitude),np.ravel(self.longitude)
 
-###
-
 if __name__ == '__main__':
     fig_gen = fig_generator(1,1)
 
@@ -231,6 +228,8 @@ if __name__ == '__main__':
     #     SRC_DIRECTORY_BASE='./'
     # SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS/'
     SRC_DIRECTORY=data_src_directory()+'MODIS/'
+
+    print('loading: ',SRC_DIRECTORY+'MYD05_L2.A2015304.2125.006.2015305175459.hdf\n')
     
     test_modis_obj = MODIS_DataField(\
                                         datafilename='MYD05_L2.A2015304.2125.006.2015305175459.hdf'\

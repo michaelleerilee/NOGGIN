@@ -1,4 +1,4 @@
-#!/opt/local/bin/python
+#!/usr/bin/env python
 
 # (find-file-other-frame "2018-0317-AdaptiveSketchNotes-1.org")
 
@@ -18,17 +18,19 @@ from MODIS_DataField import MODIS_DataField
 # for kriging, plotting
 from scipy.spatial import ConvexHull
 
+SRC_DIRECTORY=data_src_directory()
+
 FILE_NAMES=[
 'MYD05_L2.A2015304.1945.006.2015305180304.hdf',
 'MYD05_L2.A2015304.2125.006.2015305175459.hdf'
 ]
-MODIS_DIR="MODIS/"
+MODIS_DIR=SRC_DIRECTORY+"MODIS/"
 
 FILE_NAMES=[
 'MYD05_L2.A2015304.2125.061.2018054031117.hdf',
 'MYD05_L2.A2015304.1945.061.2018054025242.hdf'
 ]
-MODIS_DIR="MODIS-61/"
+MODIS_DIR=SRC_DIRECTORY+"MODIS-61/"
 
 # COMPARISON_FILE='MOD05_L2.A2015304.1815.006.2015308155414.hdf'
 COMPARISON_FILE='MOD05_L2.A2015304.1815.061.2017323092403.hdf'
