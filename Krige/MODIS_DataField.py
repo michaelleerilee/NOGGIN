@@ -80,6 +80,12 @@ class Point():
         return "Point.inDegrees: unkown argument: order = "+order
     def str(self):
         return "<Point lon_degrees="+str(self.lon_degrees)+" lat_degrees="+str(self.lat_degrees)+"/>"
+
+
+def box_covering(lon,lat):
+    """Make a BB covering, arguments (lon,lat) are arrays of lat and lon in degrees."""
+    return BoundingBox(( Point((np.nanmin(lon),np.nanmin(lat)))\
+                         ,Point((np.nanmax(lon),np.nanmax(lat))) ))
     
 class BoundingBox():
     p0 = None; p1 = None
@@ -195,6 +201,7 @@ class MODIS_DataField():
             self.latitude = lat[:,:]
             lon = hdf.select('Longitude')
             self.longitude = lon[:,:]
+            self.bbox = box_covering(self.longitude,self.latitude)
         
     def init_basemap(self,ax=None,wh_scale=(1.5,1.5)\
                          ,lat_center=None, lon_center=None
@@ -378,7 +385,37 @@ class TestPoint(unittest.TestCase):
                          ,BoundingBox((Point((0,0)),Point((1,1))))\
                          .overlap(BoundingBox((Point((0.5,0.25)),Point((1.5,1.5)))))\
                          .str())
-                                  
+
+    def test_Covering(self):
+        self.assertEqual('<BoundingBox>\n'\
+                         +'  <Point lon_degrees=0.0 lat_degrees=0.0/>\n'\
+                         +'  <Point lon_degrees=1.0 lat_degrees=3.0/>\n'\
+                         +'</BoundingBox>\n'\
+                         ,box_covering([0.0,0.5,1.0],[0.0,1.0,1.5,3.0])\
+                         .str())
+
+    def test_MODIS_bbox(self):
+        SRC_DIRECTORY=data_src_directory()+'MODIS/'
+        test_modis_obj_0 = MODIS_DataField(\
+                                        datafilename='MYD05_L2.A2015304.2125.006.2015305175459.hdf'\
+                                        ,datafieldname='Water_Vapor_Infrared'\
+                                        ,srcdirname=SRC_DIRECTORY\
+                                        )
+        test_modis_obj_1 = MODIS_DataField(\
+                                         datafilename='MOD05_L2.A2015304.1815.006.2015308155414.hdf'\
+                                         ,datafieldname='Water_Vapor_Infrared'\
+                                         ,srcdirname=SRC_DIRECTORY\
+                                         )
+        # print test_modis_obj_0.bbox.str()
+        # print test_modis_obj_1.bbox.str()
+        # print test_modis_obj_0.bbox.overlap(test_modis_obj_1.bbox).str()
+        # print test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox).str()
+        self.assertEqual( '<BoundingBox>\n'\
+                          +'  <Point lon_degrees=-125.555 lat_degrees=16.4271/>\n'\
+                          +'  <Point lon_degrees=-108.908 lat_degrees=34.1759/>\n'\
+                          +'</BoundingBox>\n'\
+                          ,test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox).str() )
+
         
 def demo_modis_obj(show=False):
     if not show:
@@ -413,6 +450,8 @@ def demo_modis_obj(show=False):
                                          )
     test_modis_obj.colormesh(vmin=1.0,vmax=3.0)
 
+    # print test_modis_obj.bbox.str()
+
     fig_gen.increment_figure()
     test_modis_obj_1 = MODIS_DataField(\
                                            data       = test_modis_obj.data\
@@ -427,6 +466,7 @@ def demo_modis_obj(show=False):
 if __name__ == '__main__':
 
     demo_modis_obj(False)
-    # Test
-    unittest.main()
-    
+
+    if True:
+        unittest.main()
+        
