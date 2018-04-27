@@ -1,4 +1,4 @@
-#!/opt/local/bin/python
+#!/usr/bin/env python
 """
 Read datafiles to construct metadata helping comparisons and intersections.
 

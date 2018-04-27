@@ -13,6 +13,113 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 from noggin import fig_generator, data_src_directory
 
+import unittest
+
+class Interval():
+    def __init__(self):
+        """An interval."""
+        self.x0 = None
+        self.x1 = None
+    def __init__(self,lst=None):
+        if lst is None:
+            self.x0 = None
+            self.x1 = None
+        else:            
+            self.x0 = min(lst)
+            self.x1 = max(lst)
+    def tuple(self):
+        return (self.x0,self.x1)
+    def list(self):
+        return [self.x0,self.x1]
+    def emptyp(self):
+        return (self.x0 is None) and (self.x1 is None)
+    def overlap(self,z):
+        a0 = self.x0
+        a1 = self.x1
+        b0 = z.x0
+        b1 = z.x1
+
+        l0 = float('-inf')
+        l1 = float( 'inf')
+        if (b1 < a0) or (a1 < b0):
+            return Interval()
+        else:
+            if a0 >= b0:
+                l0 = a0
+            else:
+                l0 = b0
+            if a1 <= b1:
+                l1 = a1
+            else:
+                l1 = b1
+        return Interval((l0,l1))
+
+class Point():
+    lat_degrees=0.0
+    lon_degrees=0.0
+    def __init__(self):
+        """A point on the sphere."""
+    def __init__(self,lonlat_degrees=None,latlon_degrees=None):
+        """Make a point from a tuple or the individual lat and lon"""
+        assert not isinstance(lonlat_degrees,basestring)
+        assert not isinstance(latlon_degrees,basestring)
+        if lonlat_degrees is not None:
+            self.lon_degrees = lonlat_degrees[0]
+            self.lat_degrees  = lonlat_degrees[1]
+        elif latlon_degrees is not None:
+            self.lon_degrees = latlon_degrees[1]
+            self.lat_degrees  = latlon_degrees[0]
+        else:
+            self.lon_degrees = None
+            self.lat_degrees = None
+    def inDegrees(self,order="lonlat"):
+        if   order == "lonlat":
+            return (self.lon_degrees,self.lat_degrees)
+        elif order == "latlon":
+            return (self.lat_degrees,self.lon_degrees)
+        return "Point.inDegrees: unkown argument: order = "+order
+    def str(self):
+        return "<Point lon_degrees="+str(self.lon_degrees)+" lat_degrees="+str(self.lat_degrees)+"/>"
+    
+class BoundingBox():
+    p0 = None; p1 = None
+    def __init__(self):
+        """A box."""
+    def __init__(self,p=(Point(),Point())):
+        self.p0 = p[0]
+        self.p1 = p[1]
+        self.lon_interval = Interval([self.p0.lon_degrees, self.p1.lon_degrees])
+        self.lat_interval = Interval([self.p0.lat_degrees, self.p1.lat_degrees])
+    def emptyp(self):
+        return (self.lon_interval.emptyp() or self.lat_interval.emptyp())
+    def str(self):
+        return \
+            "<BoundingBox>\n"\
+            "  "+self.p0.str()+"\n"\
+            "  "+self.p1.str()+"\n"\
+            +"</BoundingBox>\n"
+    
+    def overlap(self,other_box):
+        if self.emptyp() or other_box.emptyp():
+            return BoundingBox()
+        
+        lon_overlap = self.lon_interval.overlap(other_box.lon_interval)
+        if lon_overlap.emptyp():
+            return BoundingBox()
+        lat_overlap = self.lat_interval.overlap(other_box.lat_interval)
+        if lat_overlap.emptyp():
+            return BoundingBox()
+        
+        o_lon_interval = other_box.lon_interval
+        if o_lon_interval.emptyp():
+            return BoundingBox()
+        o_lat_interval = other_box.lat_interval
+        if o_lat_interval.emptyp():
+            return BoundingBox()
+
+        return BoundingBox(( Point((lon_overlap.x0,lat_overlap.x0))\
+                           ,Point((lon_overlap.x1,lat_overlap.x1)) ))
+        
 class MODIS_DataField():
     """Access a datafield in a MODIS file"""
     key_along  ='Cell_Along_Swath_5km:mod05'
@@ -219,7 +326,64 @@ class MODIS_DataField():
         return \
           np.ravel(self.data),np.ravel(self.latitude),np.ravel(self.longitude)
 
-if __name__ == '__main__':
+
+
+class TestPoint(unittest.TestCase):
+
+    def test_Point(self):
+        self.assertEqual((None,None),Point().inDegrees())
+        self.assertEqual((1,0),Point(latlon_degrees=(0,1)).inDegrees())
+        self.assertEqual((2,3),Point((2,3)).inDegrees())
+        self.assertEqual('<Point lon_degrees=None lat_degrees=None/>',Point().str())
+        self.assertEqual('<Point lon_degrees=0 lat_degrees=1/>',Point((0,1)).str())
+
+    def test_Interval(self):
+        self.assertEqual((None,None),Interval().tuple())
+        self.assertEqual((0,1),Interval([0,1]).tuple())
+        self.assertEqual([1,2],Interval(lst=[1,2]).list())
+        self.assertEqual([1,2],Interval([2,1]).list())
+
+    def test_IntervalEmpty(self):
+        self.assertEqual(False,Interval([0,1]).emptyp())
+        self.assertEqual(True,Interval().emptyp())
+
+    def test_IntervalOverlap(self):
+        self.assertEqual([None,None],Interval([0,1]).overlap(Interval([2,3])).list())
+        self.assertEqual([0,0.5],Interval([0,1]).overlap(Interval([-0.5,0.5])).list())
+        self.assertEqual([0,0],Interval([0,1]).overlap(Interval([-0.5,0])).list())
+        self.assertEqual([1,1],Interval([0,1]).overlap(Interval([1,1.5])).list())
+        self.assertEqual([0.25,0.75],Interval([0,1]).overlap(Interval([0.25,0.75])).list())
+        self.assertEqual([0.25,0.75],Interval([0.25,0.75]).overlap(Interval([0,1])).list())
+        self.assertEqual([0,1],Interval([0,1]).overlap(Interval([0,1])).list())
+        self.assertEqual([0.5,0.5],Interval([0.5,0.5]).overlap(Interval([0,1])).list())
+        
+    def test_BoundingBox(self):
+        # print '\n'+BoundingBox().str()
+        self.assertEqual('<BoundingBox>\n  <Point lon_degrees=None lat_degrees=None/>\n  '\
+                         +'<Point lon_degrees=None lat_degrees=None/>\n</BoundingBox>\n'\
+                         ,BoundingBox().str())
+        self.assertEqual(True,BoundingBox().emptyp())
+        self.assertEqual(False,BoundingBox((Point((0,0)),Point((1,1)))).emptyp())
+        # print '\n'+BoundingBox((Point((0,0)),Point((1,1)))).str()
+        self.assertEqual('<BoundingBox>\n'\
+                         +'  <Point lon_degrees=0 lat_degrees=0/>\n'\
+                         +'  <Point lon_degrees=1 lat_degrees=1/>\n'\
+                         +'</BoundingBox>\n'\
+                         ,BoundingBox((Point((0,0)),Point((1,1)))).str())
+        # print '\n'+BoundingBox((Point((0.5,0.5)),Point((1.5,1.5)))).str()
+        self.assertEqual('<BoundingBox>\n'\
+                         +'  <Point lon_degrees=0.5 lat_degrees=0.25/>\n'\
+                         +'  <Point lon_degrees=1 lat_degrees=1/>\n'\
+                         +'</BoundingBox>\n'\
+                         ,BoundingBox((Point((0,0)),Point((1,1))))\
+                         .overlap(BoundingBox((Point((0.5,0.25)),Point((1.5,1.5)))))\
+                         .str())
+                                  
+        
+def demo_modis_obj(show=False):
+    if not show:
+        return
+    
     fig_gen = fig_generator(1,1)
 
     # if('NOGGIN_DATA_SRC_DIRECTORY' in os.environ):
@@ -259,3 +423,10 @@ if __name__ == '__main__':
     test_modis_obj_1.scatterplot(vmin=1.0,vmax=3.0,title='scatter',colorbar=True)
 
     plt.show()
+    
+if __name__ == '__main__':
+
+    demo_modis_obj(False)
+    # Test
+    unittest.main()
+    
