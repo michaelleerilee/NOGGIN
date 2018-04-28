@@ -86,6 +86,8 @@ def box_covering(lon,lat):
     """Make a BB covering, arguments (lon,lat) are arrays of lat and lon in degrees."""
     return BoundingBox(( Point((np.nanmin(lon),np.nanmin(lat)))\
                          ,Point((np.nanmax(lon),np.nanmax(lat))) ))
+
+    
     
 class BoundingBox():
     p0 = None; p1 = None
@@ -106,6 +108,7 @@ class BoundingBox():
             +"</BoundingBox>\n"
     
     def overlap(self,other_box):
+        """Intersection"""
         if self.emptyp() or other_box.emptyp():
             return BoundingBox()
         
@@ -125,7 +128,19 @@ class BoundingBox():
 
         return BoundingBox(( Point((lon_overlap.x0,lat_overlap.x0))\
                            ,Point((lon_overlap.x1,lat_overlap.x1)) ))
-        
+
+    def lons_lats(self):
+        if self.emptyp():
+            return [],[]
+        else:
+            return [self.p0.lon_degrees,self.p1.lon_degrees],[ self.p0.lat_degrees,self.p1.lat_degrees]
+
+    def union(self,other_box):
+        lons,lats   = self.lons_lats()
+        olons,olats = other_box.lons_lats()
+        return box_covering(np.array(lons+olons),np.array(lats+olats))
+
+    
 class MODIS_DataField():
     """Access a datafield in a MODIS file"""
     key_along  ='Cell_Along_Swath_5km:mod05'
@@ -202,7 +217,9 @@ class MODIS_DataField():
             lon = hdf.select('Longitude')
             self.longitude = lon[:,:]
             self.bbox = box_covering(self.longitude,self.latitude)
-        
+        else:
+            print('geofile not implemented!')
+            
     def init_basemap(self,ax=None,wh_scale=(1.5,1.5)\
                          ,lat_center=None, lon_center=None
                          ):
@@ -371,6 +388,7 @@ class TestPoint(unittest.TestCase):
                          ,BoundingBox().str())
         self.assertEqual(True,BoundingBox().emptyp())
         self.assertEqual(False,BoundingBox((Point((0,0)),Point((1,1)))).emptyp())
+        self.assertEqual(([0,1],[0,1]),BoundingBox((Point((0,0)),Point((1,1)))).lons_lats())
         # print '\n'+BoundingBox((Point((0,0)),Point((1,1)))).str()
         self.assertEqual('<BoundingBox>\n'\
                          +'  <Point lon_degrees=0 lat_degrees=0/>\n'\
@@ -393,6 +411,17 @@ class TestPoint(unittest.TestCase):
                          +'</BoundingBox>\n'\
                          ,box_covering([0.0,0.5,1.0],[0.0,1.0,1.5,3.0])\
                          .str())
+        bb0 = BoundingBox((Point((0.0,0.0)),Point((1.0,1.0))))
+        bb1 = BoundingBox((Point((2.0,2.0)),Point((3.0,3.0))))
+        self.assertEqual('<BoundingBox>\n'\
+                         +'  <Point lon_degrees=0.0 lat_degrees=0.0/>\n'\
+                         +'  <Point lon_degrees=3.0 lat_degrees=3.0/>\n'\
+                         +'</BoundingBox>\n'\
+                         ,bb0.union(bb1).str())
+        bbz = BoundingBox()
+        self.assertEqual(bb0.str(),bb0.union(bbz).str())
+        self.assertEqual(bb0.str(),bbz.union(bb0).str())
+        
 
     def test_MODIS_bbox(self):
         SRC_DIRECTORY=data_src_directory()+'MODIS/'
@@ -415,6 +444,13 @@ class TestPoint(unittest.TestCase):
                           +'  <Point lon_degrees=-108.908 lat_degrees=34.1759/>\n'\
                           +'</BoundingBox>\n'\
                           ,test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox).str() )
+
+        self.assertEqual( '<BoundingBox>\n'\
+                          +'  <Point lon_degrees=-135.695 lat_degrees=13.1476/>\n'\
+                          +'  <Point lon_degrees=-98.0147 lat_degrees=37.4734/>\n'\
+                          +'</BoundingBox>\n'\
+                          ,test_modis_obj_1.bbox.union(test_modis_obj_0.bbox).str() )
+        
 
         
 def demo_modis_obj(show=False):
