@@ -33,6 +33,8 @@ class Interval():
         return [self.x0,self.x1]
     def emptyp(self):
         return (self.x0 is None) and (self.x1 is None)
+    def contains(self,x):
+        return (self.x0 <= x) and (x <= self.x1)
     def overlap(self,z):
         a0 = self.x0
         a1 = self.x1
@@ -140,6 +142,9 @@ class BoundingBox():
         olons,olats = other_box.lons_lats()
         return box_covering(np.array(lons+olons),np.array(lats+olats))
 
+    def contains_point(self,p):
+        lon,lat=p.inDegrees()
+        return self.lon_interval.contains(lon) and self.lat_interval.contains(lat)
     
 class MODIS_DataField():
     """Access a datafield in a MODIS file"""
@@ -380,6 +385,10 @@ class TestPoint(unittest.TestCase):
         self.assertEqual([0.25,0.75],Interval([0.25,0.75]).overlap(Interval([0,1])).list())
         self.assertEqual([0,1],Interval([0,1]).overlap(Interval([0,1])).list())
         self.assertEqual([0.5,0.5],Interval([0.5,0.5]).overlap(Interval([0,1])).list())
+
+    def test_contains(self):
+        self.assertEqual(True,Interval([0.0,1.0]).contains(0.5))
+        self.assertEqual(False,Interval([0.0,1.0]).contains(1.5))
         
     def test_BoundingBox(self):
         # print '\n'+BoundingBox().str()
@@ -403,6 +412,17 @@ class TestPoint(unittest.TestCase):
                          ,BoundingBox((Point((0,0)),Point((1,1))))\
                          .overlap(BoundingBox((Point((0.5,0.25)),Point((1.5,1.5)))))\
                          .str())
+
+    def test_bbox_contains(self):
+        self.assertEqual(True\
+                         ,BoundingBox((Point((0,0)),Point((1,1))))\
+                         .contains_point(Point((0.5,0.5))))
+        self.assertEqual(False\
+                         ,BoundingBox((Point((0,0)),Point((1,1))))\
+                         .contains_point(Point((1.1,0.5))))
+        self.assertEqual(True\
+                         ,BoundingBox((Point((0,0)),Point((1,1))))\
+                         .contains_point(Point((1.0,0.5))))
 
     def test_Covering(self):
         self.assertEqual('<BoundingBox>\n'\
