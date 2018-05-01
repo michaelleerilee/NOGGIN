@@ -5,6 +5,7 @@ Prepare a MODIS datafield for further processing using python tools. Provide a b
 2018-0423-1352-44-EDT ML Rilee, RSTLLC, mike@rilee.net.
 """
 
+import json
 import os
 import numpy as np
 from pyhdf.SD import SD, SDC
@@ -31,6 +32,8 @@ class Interval():
         return (self.x0,self.x1)
     def list(self):
         return [self.x0,self.x1]
+    def centroid(self):
+        return 0.5*(self.x0+self.x1)
     def emptyp(self):
         return (self.x0 is None) and (self.x1 is None)
     def contains(self,x):
@@ -80,50 +83,102 @@ class Point():
         elif order == "latlon":
             return (self.lat_degrees,self.lon_degrees)
         return "Point.inDegrees: unkown argument: order = "+order
-    def str(self):
+    def to_xml(self):
         return "<Point lon_degrees="+str(self.lon_degrees)+" lat_degrees="+str(self.lat_degrees)+"/>"
+    def copy(self):
+        return Point((self.lon_degrees,self.lat_degrees))
 
-
-def box_covering(lon,lat):
+def box_covering(lon,lat,hack_branchcut_threshold=-1):
     """Make a BB covering, arguments (lon,lat) are arrays of lat and lon in degrees."""
+    if hack_branchcut_threshold > 0:
+        lon0=np.nanmin(lon)
+        lon1=np.nanmax(lon)
+        if lon1-lon0 > hack_branchcut_threshold:
+            _lon = np.copy(lon)
+            idltz=np.where(_lon < 0)
+            _lon[idltz] = _lon[idltz] + 360.0
+            # print 100,np.nanmin(_lon)
+            # print 101,np.nanmax(_lon)
+            # print 102,lon
+            # print 103,lat
+            # print 104,_lon
+            return BoundingBox(( Point((np.nanmin(_lon),np.nanmin(lat)))\
+                                 ,Point((np.nanmax(_lon),np.nanmax(lat))) ))
+        
     return BoundingBox(( Point((np.nanmin(lon),np.nanmin(lat)))\
                          ,Point((np.nanmax(lon),np.nanmax(lat))) ))
 
-    
-    
 class BoundingBox():
     p0 = None; p1 = None
     def __init__(self):
         """A box."""
     def __init__(self,p=(Point(),Point())):
+        self.init(p)
+        # self.p0 = p[0]
+        # self.p1 = p[1]
+        # self.lon_interval = Interval([self.p0.lon_degrees, self.p1.lon_degrees])
+        # self.lat_interval = Interval([self.p0.lat_degrees, self.p1.lat_degrees])
+    def init(self,p=(Point(),Point())):
         self.p0 = p[0]
         self.p1 = p[1]
         self.lon_interval = Interval([self.p0.lon_degrees, self.p1.lon_degrees])
         self.lat_interval = Interval([self.p0.lat_degrees, self.p1.lat_degrees])
+    def copy(self):
+        """Return a deep copy of this object."""
+        return BoundingBox((self.p0.copy(),self.p1.copy()))
+    def centroid(self):
+        lon0 = self.lon_interval.centroid()
+        lat0 = self.lat_interval.centroid()
+        return Point((lon0,lat0))
     def emptyp(self):
         return (self.lon_interval.emptyp() or self.lat_interval.emptyp())
-    def str(self):
+    def to_xml(self):
         return \
             "<BoundingBox>\n"\
-            "  "+self.p0.str()+"\n"\
-            "  "+self.p1.str()+"\n"\
+            "  "+self.p0.to_xml()+"\n"\
+            "  "+self.p1.to_xml()+"\n"\
             +"</BoundingBox>\n"
+    def to_json(self):
+        return json.dumps(['BoundingBox',{ 'p0':tuple(map(float,self.p0.inDegrees()))\
+                                          ,'p1':tuple(map(float,self.p1.inDegrees())) }])
+        # p0lon,p0lat = tuple(map(float,self.p0.inDegrees()))
+        # p1lon,p1lat = tuple(map(float,self.p1.inDegrees()))
+        # # print 'type-p0lon: ',type(p0lon)
+        # return json.dumps(['BoundingBox',{'p0': (p0lon,p0lat),'p1': (p1lon,p1lat) }])
+        # return json.dumps(['BoundingBox',{'p0':self.p0.inDegrees(),'p1':self.p1.inDegrees()}])
+        # return json.dumps(['BoundingBox',{'p0':str(type(self.p0.inDegrees())),'p1':str(self.p1.inDegrees())}])
+    def from_json(self,json_str):
+        res = json.loads(json_str)
+        points = res[1]
+        # Can we just call __init__ again?
+        self.init((Point(points['p0']),Point(points['p1'])))
+        # self.p0 = Point(points['p0'])
+        # self.p1 = Point(points['p1'])
+        # self.lon_interval = Interval([self.p0.lon_degrees, self.p1.lon_degrees])
+        # self.lat_interval = Interval([self.p0.lat_degrees, self.p1.lat_degrees])
+        return self
     
     def overlap(self,other_box):
         """Intersection"""
-        if self.emptyp() or other_box.emptyp():
+
+        if self.emptyp():
+            return BoundingBox()
+
+        if other_box.emptyp():
             return BoundingBox()
         
         lon_overlap = self.lon_interval.overlap(other_box.lon_interval)
         if lon_overlap.emptyp():
             return BoundingBox()
+        
         lat_overlap = self.lat_interval.overlap(other_box.lat_interval)
         if lat_overlap.emptyp():
             return BoundingBox()
-        
+
         o_lon_interval = other_box.lon_interval
         if o_lon_interval.emptyp():
             return BoundingBox()
+
         o_lat_interval = other_box.lat_interval
         if o_lat_interval.emptyp():
             return BoundingBox()
@@ -137,15 +192,32 @@ class BoundingBox():
         else:
             return [self.p0.lon_degrees,self.p1.lon_degrees],[ self.p0.lat_degrees,self.p1.lat_degrees]
 
-    def union(self,other_box):
+    def polygon(self):
+        return \
+            [\
+             self.p0.lon_degrees
+             ,self.p1.lon_degrees
+             ,self.p1.lon_degrees
+             ,self.p0.lon_degrees
+            ]\
+            ,\
+            [\
+              self.p0.lat_degrees
+              ,self.p0.lat_degrees
+              ,self.p1.lat_degrees
+              ,self.p1.lat_degrees
+            ]
+
+    def union(self,other_box,hack_branchcut_threshold=-1):
         lons,lats   = self.lons_lats()
         olons,olats = other_box.lons_lats()
-        return box_covering(np.array(lons+olons),np.array(lats+olats))
+        return box_covering(np.array(lons+olons),np.array(lats+olats)\
+                            ,hack_branchcut_threshold=hack_branchcut_threshold)
 
     def contains_point(self,p):
         lon,lat=p.inDegrees()
         return self.lon_interval.contains(lon) and self.lat_interval.contains(lat)
-    
+
 class MODIS_DataField():
     """Access a datafield in a MODIS file"""
     key_along  ='Cell_Along_Swath_5km:mod05'
@@ -223,7 +295,8 @@ class MODIS_DataField():
             self.longitude = lon[:,:]
             self.bbox = box_covering(self.longitude,self.latitude)
         else:
-            print('geofile not implemented!')
+            print('separate geofile with location information not implemented!')
+            # TODO implement or raise exception
             
     def init_basemap(self,ax=None,wh_scale=(1.5,1.5)\
                          ,lat_center=None, lon_center=None
@@ -363,8 +436,8 @@ class TestPoint(unittest.TestCase):
         self.assertEqual((None,None),Point().inDegrees())
         self.assertEqual((1,0),Point(latlon_degrees=(0,1)).inDegrees())
         self.assertEqual((2,3),Point((2,3)).inDegrees())
-        self.assertEqual('<Point lon_degrees=None lat_degrees=None/>',Point().str())
-        self.assertEqual('<Point lon_degrees=0 lat_degrees=1/>',Point((0,1)).str())
+        self.assertEqual('<Point lon_degrees=None lat_degrees=None/>',Point().to_xml())
+        self.assertEqual('<Point lon_degrees=0 lat_degrees=1/>',Point((0,1)).to_xml())
 
     def test_Interval(self):
         self.assertEqual((None,None),Interval().tuple())
@@ -391,27 +464,29 @@ class TestPoint(unittest.TestCase):
         self.assertEqual(False,Interval([0.0,1.0]).contains(1.5))
         
     def test_BoundingBox(self):
-        # print '\n'+BoundingBox().str()
+        # print '\n'+BoundingBox().to_xml()
         self.assertEqual('<BoundingBox>\n  <Point lon_degrees=None lat_degrees=None/>\n  '\
                          +'<Point lon_degrees=None lat_degrees=None/>\n</BoundingBox>\n'\
-                         ,BoundingBox().str())
+                         ,BoundingBox().to_xml())
         self.assertEqual(True,BoundingBox().emptyp())
         self.assertEqual(False,BoundingBox((Point((0,0)),Point((1,1)))).emptyp())
         self.assertEqual(([0,1],[0,1]),BoundingBox((Point((0,0)),Point((1,1)))).lons_lats())
-        # print '\n'+BoundingBox((Point((0,0)),Point((1,1)))).str()
+        # print '\n'+BoundingBox((Point((0,0)),Point((1,1)))).to_xml()
         self.assertEqual('<BoundingBox>\n'\
                          +'  <Point lon_degrees=0 lat_degrees=0/>\n'\
                          +'  <Point lon_degrees=1 lat_degrees=1/>\n'\
                          +'</BoundingBox>\n'\
-                         ,BoundingBox((Point((0,0)),Point((1,1)))).str())
-        # print '\n'+BoundingBox((Point((0.5,0.5)),Point((1.5,1.5)))).str()
+                         ,BoundingBox((Point((0,0)),Point((1,1)))).to_xml())
+        # print '\n'+BoundingBox((Point((0.5,0.5)),Point((1.5,1.5)))).to_xml()
         self.assertEqual('<BoundingBox>\n'\
                          +'  <Point lon_degrees=0.5 lat_degrees=0.25/>\n'\
                          +'  <Point lon_degrees=1 lat_degrees=1/>\n'\
                          +'</BoundingBox>\n'\
                          ,BoundingBox((Point((0,0)),Point((1,1))))\
                          .overlap(BoundingBox((Point((0.5,0.25)),Point((1.5,1.5)))))\
-                         .str())
+                         .to_xml())
+        self.assertEqual('<Point lon_degrees=0.5 lat_degrees=0.5/>'\
+                         ,BoundingBox((Point((0,0)),Point((1,1)))).centroid().to_xml())
 
     def test_bbox_contains(self):
         self.assertEqual(True\
@@ -430,17 +505,29 @@ class TestPoint(unittest.TestCase):
                          +'  <Point lon_degrees=1.0 lat_degrees=3.0/>\n'\
                          +'</BoundingBox>\n'\
                          ,box_covering([0.0,0.5,1.0],[0.0,1.0,1.5,3.0])\
-                         .str())
+                         .to_xml())
         bb0 = BoundingBox((Point((0.0,0.0)),Point((1.0,1.0))))
         bb1 = BoundingBox((Point((2.0,2.0)),Point((3.0,3.0))))
         self.assertEqual('<BoundingBox>\n'\
                          +'  <Point lon_degrees=0.0 lat_degrees=0.0/>\n'\
                          +'  <Point lon_degrees=3.0 lat_degrees=3.0/>\n'\
                          +'</BoundingBox>\n'\
-                         ,bb0.union(bb1).str())
+                         ,bb0.union(bb1).to_xml())
         bbz = BoundingBox()
-        self.assertEqual(bb0.str(),bb0.union(bbz).str())
-        self.assertEqual(bb0.str(),bbz.union(bb0).str())
+        self.assertEqual(bb0.to_xml(),bb0.union(bbz).to_xml())
+        self.assertEqual(bb0.to_xml(),bbz.union(bb0).to_xml())
+        self.assertEqual('<BoundingBox>\n'\
+                         +'  <Point lon_degrees=-165.0 lat_degrees=40.0/>\n'\
+                         +'  <Point lon_degrees=165.0 lat_degrees=50.0/>\n'\
+                         +'</BoundingBox>\n'\
+                         ,box_covering([-165.0,165],[40.0,50.0]).to_xml())
+        self.assertEqual('<BoundingBox>\n'\
+                         +'  <Point lon_degrees=-180.0 lat_degrees=40.0/>\n'\
+                         +'  <Point lon_degrees=180.0 lat_degrees=50.0/>\n'\
+                         +'</BoundingBox>\n'\
+                         ,box_covering([-165.0,165.0],[40.0,50.0]\
+                                       ,hack_branchcut_threshold=180.0).to_xml())
+
         
 
     def test_MODIS_bbox(self):
@@ -455,23 +542,60 @@ class TestPoint(unittest.TestCase):
                                          ,datafieldname='Water_Vapor_Infrared'\
                                          ,srcdirname=SRC_DIRECTORY\
                                          )
-        # print test_modis_obj_0.bbox.str()
-        # print test_modis_obj_1.bbox.str()
-        # print test_modis_obj_0.bbox.overlap(test_modis_obj_1.bbox).str()
-        # print test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox).str()
+        # print test_modis_obj_0.bbox.to_xml()
+        # print test_modis_obj_1.bbox.to_xml()
+        # print test_modis_obj_0.bbox.overlap(test_modis_obj_1.bbox).to_xml()
+        # print test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox).to_xml()
         self.assertEqual( '<BoundingBox>\n'\
                           +'  <Point lon_degrees=-125.555 lat_degrees=16.4271/>\n'\
                           +'  <Point lon_degrees=-108.908 lat_degrees=34.1759/>\n'\
                           +'</BoundingBox>\n'\
-                          ,test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox).str() )
+                          ,test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox).to_xml() )
 
         self.assertEqual( '<BoundingBox>\n'\
                           +'  <Point lon_degrees=-135.695 lat_degrees=13.1476/>\n'\
                           +'  <Point lon_degrees=-98.0147 lat_degrees=37.4734/>\n'\
                           +'</BoundingBox>\n'\
-                          ,test_modis_obj_1.bbox.union(test_modis_obj_0.bbox).str() )
+                          ,test_modis_obj_1.bbox.union(test_modis_obj_0.bbox).to_xml() )
         
+    def test_json(self):
+        self.assertEqual('["BoundingBox", {"p0": [0.0, 0.0], "p1": [1.0, 1.0]}]'\
+                         ,BoundingBox((Point((0,0)),Point((1,1)))).to_json())
+        self.assertEqual('["BoundingBox", {"p0": [0.0, 0.1], "p1": [-1.7, 1.0]}]'\
+                         ,BoundingBox((Point((0,0.1)),Point((-1.7,1)))).to_json())
+        self.assertEqual('["BoundingBox", {"p0": [0.0, 0.0], "p1": [1.0, 1.0]}]'\
+                         ,BoundingBox()\
+                         .from_json(BoundingBox((Point((0,0)),Point((1,1)))).to_json()).to_json())
 
+    def test_overlap_empty_bug(self):
+        """BoundinbBox.from_json was not initializing the intervals."""
+        a=BoundingBox((Point((0,0)),Point((1.0,1.0))))\
+                         .overlap(BoundingBox((Point((0,0)),Point((1.0,1.0)))))
+        # print 'a: ',a.to_xml()
+        
+        self.assertEqual(False,a.emptyp())
+
+        self.assertEqual(False\
+                         ,BoundingBox((Point((0,0)),Point((1.0,1.0))))\
+                         .overlap(BoundingBox((Point((0,0)),Point((1.0,1.0))))).emptyp())
+
+        globeBox=BoundingBox((Point((-180.0,-90.0)),Point((180.0,90.0))))
+        SRC_DIRECTORY=data_src_directory()+'MODIS/'
+        test_modis_obj_0 = MODIS_DataField(\
+                                        datafilename='MYD05_L2.A2015304.2125.006.2015305175459.hdf'\
+                                        ,datafieldname='Water_Vapor_Infrared'\
+                                        ,srcdirname=SRC_DIRECTORY\
+                                        )
+        b=globeBox.overlap(test_modis_obj_0.bbox)
+        self.assertEqual(False,b.emptyp())
+        self.assertEqual(False,globeBox.overlap(test_modis_obj_0.bbox).emptyp())
+        # print 't',test_modis_obj_0.bbox.to_xml()
+        # print 'g',globeBox.to_xml()
+        # print 'b',b.to_xml()
+        # The following is the key to the bug.
+        obj_bb=BoundingBox().from_json(test_modis_obj_0.bbox.to_json())
+        self.assertEqual(False,obj_bb.emptyp())
+        self.assertEqual(False,globeBox.overlap(obj_bb).emptyp())
         
 def demo_modis_obj(show=False):
     if not show:
@@ -506,7 +630,7 @@ def demo_modis_obj(show=False):
                                          )
     test_modis_obj.colormesh(vmin=1.0,vmax=3.0)
 
-    # print test_modis_obj.bbox.str()
+    # print test_modis_obj.bbox.to_xml()
 
     fig_gen.increment_figure()
     test_modis_obj_1 = MODIS_DataField(\
@@ -518,6 +642,8 @@ def demo_modis_obj(show=False):
     test_modis_obj_1.scatterplot(vmin=1.0,vmax=3.0,title='scatter',colorbar=True)
 
     plt.show()
+
+
     
 if __name__ == '__main__':
 
