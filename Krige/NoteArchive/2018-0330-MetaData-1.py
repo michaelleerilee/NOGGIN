@@ -15,8 +15,14 @@ import os
 import sys
 from MODIS_DataField import MODIS_DataField, BoundingBox, Point
 
+import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
+
 _verbose=True
 _debug=False
+_plot=True
 
 if('NOGGIN_DATA_SRC_DIRECTORY' in os.environ):
     SRC_DIRECTORY_BASE=os.environ['NOGGIN_DATA_SRC_DIRECTORY']
@@ -26,6 +32,35 @@ else:
 SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS-61/'
     
 src_file_list = [f for f in os.listdir(SRC_DIRECTORY) if (lambda x: '.hdf' in x or '.HDF.' in x)(f)]
+
+if _plot:
+    # lon_0,lat_0 = krigeBox.centroid().inDegrees()
+    lon_0 = 0.0
+    lat_0 = 0.0
+    fig,ax = plt.subplots(1,1)
+    _scale = 2.0*np.pi
+    wh_scale = [_scale,_scale]
+    # m = Basemap(projection='laea', resolution='l', lat_ts=65\
+    #            ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
+    m = Basemap(projection='cyl',resolution='h'\
+                ,ax=ax\
+                ,lat_0=lat_0, lon_0=lon_0)
+    m.drawcoastlines(linewidth=0.5)
+    m.drawparallels(np.arange(50., 91., 10.), labels=[1, 0, 0, 0])
+    m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
+    color_idx=0
+    # colors=['red','green','blue','plum','seagreen']
+    colors=['silver','rosybrown','darksalmon','sandybrown','bisque','tan','moccasin'\
+            ,'chartreuse','palegreen','lightseagreen','darkturquoise','royalblue'\
+            ,'mediumpurple','plum','palevioletred']
+    
+from matplotlib.patches import Polygon
+def draw_screen_poly( lons, lats, m, facecolor='black', edgecolor='black', fill=False ):
+    x, y = m( lons, lats )
+    plt.gca().add_patch(Polygon( zip(x,y)\
+                                 ,facecolor=facecolor\
+                                 ,edgecolor=edgecolor\
+                                 ,alpha=0.8, fill=fill))
 
 if _debug:
     src_file_list = src_file_list[0:4]
@@ -38,10 +73,11 @@ for i in src_file_list:
     if _verbose:
         print ('loading ',i)
     modis_obj = MODIS_DataField(\
-                                    datafilename=i\
-                                    ,datafieldname='Water_Vapor_Infrared'\
-                                    ,srcdirname=SRC_DIRECTORY\
-                                    )
+                                datafilename=i\
+                                ,datafieldname='Water_Vapor_Infrared'\
+                                ,srcdirname=SRC_DIRECTORY\
+                                ,hack_branchcut_threshold=200\
+                                )
     bb = bb.union(modis_obj.bbox)
     modis_BoundingBoxes[i]=modis_obj.bbox
     modis_BoundingBoxes_json[i]=modis_obj.bbox.to_json()
@@ -49,6 +85,13 @@ for i in src_file_list:
     if _debug:
         print 'xml: ',bb.to_xml()
         print 'json: ',bb.to_json()
+
+    if _plot:
+        mo_poly = modis_obj.bbox.polygon()
+        color_idx = (color_idx+1) % len(colors)
+        for mp in mo_poly:
+            mp_lons,mp_lats = mp.polygon()
+            draw_screen_poly( mp_lons,mp_lats,m, facecolor=colors[color_idx], edgecolor='blue', fill=True )
 
 if _verbose:
     print 'writing to '+SRC_DIRECTORY+'modis_BoundingBoxes.json'
@@ -92,3 +135,5 @@ if _debug:
 if _verbose:
     print 'finished writing MetaData'
 
+if _plot:
+    plt.show()

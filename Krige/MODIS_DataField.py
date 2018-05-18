@@ -163,16 +163,35 @@ def box_covering(lon,lat,hack_branchcut_threshold=-1):
             _lon = np.copy(lon)
             idltz=np.where(_lon < 0)
             _lon[idltz] = _lon[idltz] + 360.0
+            _lon_mn = np.nanmin(_lon)
+            if _lon_mn > 180:
+                _lon_mn = _lon_mn - 360
+            _lon_mx = np.nanmax(_lon)
+            if _lon_mx > 180:
+                _lon_mx = _lon_mx - 360
             # print 100,np.nanmin(_lon)
             # print 101,np.nanmax(_lon)
             # print 102,lon
             # print 103,lat
             # print 104,_lon
-            return BoundingBox(( Point((np.nanmin(_lon),np.nanmin(lat)))\
-                                 ,Point((np.nanmax(_lon),np.nanmax(lat))) ))
+            return BoundingBox(( Point((_lon_mn,np.nanmin(lat)))\
+                                 ,Point((_lon_mx,np.nanmax(lat))) ))
         
     return BoundingBox(( Point((np.nanmin(lon),np.nanmin(lat)))\
                          ,Point((np.nanmax(lon),np.nanmax(lat))) ))
+
+class Polygon(object):
+    def __init__(self):
+        self.lons=[]
+        self.lats=[]
+    def __init__(self,lons_lats):
+        self.lons=lons_lats[0]
+        self.lats=lons_lats[1]
+    def add_point(self,lon_lat):
+        self.lons.add(lon_lat[0])
+        self.lats.add(lon_lat[1])
+    def polygon(self):
+        return self.lons,self.lats
 
 class BoundingBox(object):
     p0 = None; p1 = None
@@ -225,32 +244,38 @@ class BoundingBox(object):
         return self
     
     def overlap(self,other_box):
-        """Intersection"""
+        """Intersection
+        
+        Returns a list of BoundingBoxes corresponding to intersections
+        of this and the other_box.
+        """
 
         if self.emptyp():
-            return BoundingBox()
+            return []
 
         if other_box.emptyp():
-            return BoundingBox()
+            return []
         
         lon_overlaps = self.lon_interval.overlap(other_box.lon_interval)
-        if lon_overlaps[0].emptyp():
-            return BoundingBox()
+        if len(lon_overlaps) == 0:
+            return []
+        elif lon_overlaps[0].emptyp():
+            return []
         
         lat_overlap = self.lat_interval.overlap(other_box.lat_interval)
         if lat_overlap.emptyp():
-            return BoundingBox()
+            return []
 
         o_lon_interval = other_box.lon_interval
         if o_lon_interval.emptyp():
-            return BoundingBox()
+            return []
 
         o_lat_interval = other_box.lat_interval
         if o_lat_interval.emptyp():
-            return BoundingBox()
+            return []
 
         return \
-              [BoundingBox( (Point((lon.x0,lat_overlap.x0))\
+              [ BoundingBox( (Point((lon.x0,lat_overlap.x0))\
                              ,Point((lon.x1,lat_overlap.x1))) ) for lon in lon_overlaps ]
                
 #        return BoundingBox(( Point((lon_overlaps.x0,lat_overlap.x0))\
@@ -263,21 +288,58 @@ class BoundingBox(object):
             return [self.p0.lon_degrees,self.p1.lon_degrees],[ self.p0.lat_degrees,self.p1.lat_degrees]
 
     def polygon(self):
-        return \
-            [\
-             self.p0.lon_degrees
-             ,self.p1.lon_degrees
-             ,self.p1.lon_degrees
-             ,self.p0.lon_degrees
-            ]\
-            ,\
-            [\
-              self.p0.lat_degrees
-              ,self.p0.lat_degrees
-              ,self.p1.lat_degrees
-              ,self.p1.lat_degrees
-            ]
+        """
+        Return a list of polygons corresponding to the bounding box in -180..180.
+        """
+        if self.p1.lon_degrees > self.p0.lon_degrees:
+            return \
+                [Polygon((\
+                         [\
+                          self.p0.lon_degrees
+                          ,self.p1.lon_degrees
+                          ,self.p1.lon_degrees
+                          ,self.p0.lon_degrees
+                         ]\
+                         ,\
+                         [\
+                          self.p0.lat_degrees
+                          ,self.p0.lat_degrees
+                          ,self.p1.lat_degrees
+                          ,self.p1.lat_degrees
+                         ]))]
+        else:
+            return \
+                [Polygon((\
+                          [\
+                           self.p0.lon_degrees
+                           ,180
+                           ,180
+                           ,self.p0.lon_degrees
+                          ]\
+                          ,\
+                          [\
+                           self.p0.lat_degrees
+                           ,self.p0.lat_degrees
+                           ,self.p1.lat_degrees
+                           ,self.p1.lat_degrees
+                          ])),
+                 Polygon((\
+                          [\
+                           -180
+                           ,self.p1.lon_degrees
+                           ,self.p1.lon_degrees
+                           ,-180
+                          ]\
+                          ,\
+                          [\
+                           self.p0.lat_degrees
+                           ,self.p0.lat_degrees
+                           ,self.p1.lat_degrees
+                           ,self.p1.lat_degrees
+                          ]))
+                ]
 
+            
     def union(self,other_box,hack_branchcut_threshold=-1):
         lons,lats   = self.lons_lats()
         olons,olats = other_box.lons_lats()
@@ -304,17 +366,18 @@ class MODIS_DataField(object):
         """Default constructor"""
 
     def __init__(self,datafilename=None,datafieldname=None,srcdirname="./",geofile=""\
-                     ,data=None,latitude=None,longitude=None\
-                     ,colormesh_title='colormesh_title'\
-                     ,long_name='long_name'\
-                     ):
-        self.datafilename  = datafilename
-        self.datafieldname = datafieldname
-        self.data          = data
-        self.latitude      = latitude
-        self.longitude     = longitude
-        self.srcdirname    = srcdirname
-        self.geofile       = geofile
+                 ,data=None,latitude=None,longitude=None\
+                 ,colormesh_title='colormesh_title'\
+                 ,long_name='long_name'\
+                 ,hack_branchcut_threshold=0):
+        self.datafilename             = datafilename
+        self.datafieldname            = datafieldname
+        self.data                     = data
+        self.latitude                 = latitude
+        self.longitude                = longitude
+        self.srcdirname               = srcdirname
+        self.geofile                  = geofile
+        self.hack_branchcut_threshold = hack_branchcut_threshold
         # Should test that either datafilename or data is set.
         if self.datafilename is not None:
             self.load()
@@ -363,7 +426,9 @@ class MODIS_DataField(object):
             self.latitude = lat[:,:]
             lon = hdf.select('Longitude')
             self.longitude = lon[:,:]
-            self.bbox = box_covering(self.longitude,self.latitude)
+            self.bbox = box_covering(self.longitude,self.latitude\
+                                     ,hack_branchcut_threshold=self.hack_branchcut_threshold\
+                                     )
         else:
             print('separate geofile with location information not implemented!')
             # TODO implement or raise exception
@@ -556,6 +621,7 @@ class TestPoint(unittest.TestCase):
         self.assertEqual([177,180],LonInterval([175.0,-175.0]).overlap(LonInterval([ 177,-178]))[1].list())
         self.assertEqual([-180,-175.0],LonInterval([175.0,-175.0]).overlap(LonInterval([ 170,-170]))[0].list())
         self.assertEqual([175.0,180],LonInterval([175.0,-175.0]).overlap(LonInterval([ 170,-170]))[1].list())
+        self.assertEqual(2,len(LonInterval([175.0,-175.0]).overlap(LonInterval([-178, 178]))))
         self.assertEqual([-178,-175.0],LonInterval([175.0,-175.0]).overlap(LonInterval([-178, 178]))[0].list())
         self.assertEqual([175.0,178],LonInterval([175.0,-175.0]).overlap(LonInterval([-178, 178]))[1].list())
         
@@ -620,11 +686,30 @@ class TestPoint(unittest.TestCase):
         
         self.assertEqual('<BoundingBox>\n'\
                          +'  <Point lon_degrees=165.0 lat_degrees=40.0/>\n'\
-                         +'  <Point lon_degrees=185.0 lat_degrees=50.0/>\n'\
+                         +'  <Point lon_degrees=-175.0 lat_degrees=50.0/>\n'\
                          +'</BoundingBox>\n'\
                          ,box_covering([165.0,-175.0],[40.0,50.0]\
                          ,hack_branchcut_threshold=250).to_xml())
 
+        # Note that the other_box below is not running hack_branchcut, because other_box is not presumed
+        # compact.
+        self.assertEqual(2,\
+                         len(
+                             box_covering([175.0,-175.0],[40.0,50.0],hack_branchcut_threshold=250)\
+                             .overlap(box_covering([-177.0,177.0],[40.0,50.0]))))
+        self.assertEqual('<BoundingBox>\n'\
+                         +'  <Point lon_degrees=-177.0 lat_degrees=40.0/>\n'\
+                         +'  <Point lon_degrees=-175.0 lat_degrees=50.0/>\n'\
+                         +'</BoundingBox>\n'\
+                         ,box_covering([175.0,-175.0],[40.0,50.0],hack_branchcut_threshold=250)\
+                         .overlap(box_covering([-177.0,177.0],[40.0,50.0]))[0].to_xml())
+        self.assertEqual('<BoundingBox>\n'\
+                         +'  <Point lon_degrees=175.0 lat_degrees=40.0/>\n'\
+                         +'  <Point lon_degrees=177.0 lat_degrees=50.0/>\n'\
+                         +'</BoundingBox>\n'\
+                         ,box_covering([175.0,-175.0],[40.0,50.0],hack_branchcut_threshold=250)\
+                         .overlap(box_covering([-177.0,177.0],[40.0,50.0]))[1].to_xml())
+        
 
     def test_MODIS_bbox(self):
         SRC_DIRECTORY=data_src_directory()+'MODIS/'

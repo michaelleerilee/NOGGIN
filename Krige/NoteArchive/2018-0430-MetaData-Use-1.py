@@ -8,7 +8,7 @@
 import json
 import os
 import sys
-from MODIS_DataField import MODIS_DataField, BoundingBox, Point, box_covering
+from MODIS_DataField import MODIS_DataField, BoundingBox, Point, box_covering, Polygon
 
 import numpy as np
 import matplotlib as mpl
@@ -39,6 +39,13 @@ for i,v in boxes_json.iteritems():
 krigeBox = BoundingBox((Point((-180.0, 30.0))\
                        ,Point((+180.0, 40.0))))
 
+# krigeBox = BoundingBox((Point((-80.0, 30.0))\
+#                        ,Point((+80.0, 40.0))))
+
+# krigeBox = BoundingBox((Point((-175, 30.0))\
+#                        ,Point(( 175, 40.0))))
+
+
 src_data = {}
 for i,v in boxes.iteritems():
     lons,lats = v.lons_lats()
@@ -50,13 +57,16 @@ for i,v in boxes.iteritems():
         # print krigeBox.to_xml()
         # print v.to_xml()
         # print '---'
-        if not krigeBox.overlap(v).emptyp():
-            print 'adding '+i+' : '+str(v.lons_lats())
-            src_data[i] = v
-            # print '-v-'
-            # print v.to_xml()
-            # print '---'
-            #
+        if len(o) > 0:
+            for kb in o:
+                if not kb.emptyp():
+                    # not krigeBox.overlap(v).emptyp():
+                    print 'adding '+i+' : '+str(v.lons_lats())
+                    src_data[i] = v
+                    # print '-v-'
+                    # print v.to_xml()
+                    # print '---'
+                    #
     else:
         print 'warning: not adding: '+i+' : '+str(v.lons_lats())
 
@@ -81,13 +91,29 @@ def draw_screen_poly( lons, lats, m, facecolor='black', edgecolor='black', fill=
                                  ,edgecolor=edgecolor\
                                  ,alpha=0.8, fill=fill))
 
-krig_poly_lons,krig_poly_lats = krigeBox.polygon()
+krig_poly = krigeBox.polygon()
 
-draw_screen_poly( krig_poly_lons,krig_poly_lats,m, facecolor='blue', edgecolor='black', fill=True )
+if len(krig_poly) > 0:
+    for kp in krig_poly:
+        krig_poly_lons,krig_poly_lats = kp.polygon()
+        draw_screen_poly( krig_poly_lons,krig_poly_lats,m, facecolor='blue', edgecolor='black', fill=True )
 
 for i,v in src_data.iteritems():
-    v_lons,v_lats = v.polygon()
-    draw_screen_poly( v_lons, v_lats, m, facecolor='black', edgecolor='red' )
-    
+    v_poly = v.polygon()
+    if len(v_poly) > 0:
+        for vp in v_poly:
+            v_lons,v_lats = vp.polygon()
+            draw_screen_poly( v_lons, v_lats, m, facecolor='black', edgecolor='red' )
+
+
+roi_box = BoundingBox(( Point((  175, -30.0))\
+                       ,Point(( -175, -40.0))))
+
+roi_poly = roi_box.polygon()
+for rp in roi_poly:
+    r_lons,r_lats = rp.polygon()
+    draw_screen_poly( r_lons, r_lats, m, facecolor='black', edgecolor='blue' )
+
+
 plt.show()
 
