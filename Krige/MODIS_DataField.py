@@ -16,7 +16,7 @@ from noggin import fig_generator, data_src_directory
 
 import unittest
 
-class Interval():
+class Interval(object):
     def __init__(self):
         """An interval."""
         self.x0 = None
@@ -26,8 +26,8 @@ class Interval():
             self.x0 = None
             self.x1 = None
         else:            
-            self.x0 = min(lst)
-            self.x1 = max(lst)
+            self.x0 = lst[0]
+            self.x1 = lst[1]
     def tuple(self):
         return (self.x0,self.x1)
     def list(self):
@@ -59,7 +59,61 @@ class Interval():
                 l1 = b1
         return Interval((l0,l1))
 
-class Point():
+
+class LonInterval(Interval):
+    """Intervals in longitude, always ordered northward, i.e. from low to
+    high longitude (right-hand-rule).
+
+    The ordering, from west to east, implies that if a southward
+    interval is found, it crosses the international date line.
+
+    Currently we presume were on the -180..180 branch and 'split'
+    intervals that cross the date line, when needed.
+
+    TODO: Value checking, maybe branch definition.
+
+    """
+    def __init__(self,lst=None):
+        if lst is None:
+            self.x0 = None
+            self.x1 = None
+        else:
+            self.x0 = lst[0]
+            self.x1 = lst[1]
+    def to_Intervals(self):
+        if self.x1 >= self.x0:
+            return [Interval([self.x0,self.x1])]
+        else:
+            return \
+                [ Interval([-180,self.x1]) \
+                  ,Interval([self.x0,180]) ]
+    def centroid(self):
+        if self.x1 >= self.x0:
+            return super(LonInterval,self).centroid()
+        else:
+            return Interval([self.x0,self.x1+360]).centroid()
+        
+    def contains(self,x):
+        if self.x1 >= self.x0:
+            return super(LonInterval,self).contains(x)
+        else:
+            return \
+                Interval([self.x0,180]).contains(x) \
+                or Interval([-180,self.x1]).contains(x)
+
+    def overlap(self,z):
+        """Return a list of *Interval* containing the overlap of this and another LonInterval.
+
+        Returns [] if there is no overlap.
+
+        TODO Maybe return an empty LonInterval?
+        """
+        lst = [ i0.overlap(i1) for i0 in self.to_Intervals() for i1 in z.to_Intervals() ]
+        return [ i for i in lst if not i.emptyp() ]
+
+
+class Point(object):
+    """A point on the sphere with coordinates in degrees longitude and latitude."""
     lat_degrees=0.0
     lon_degrees=0.0
     def __init__(self):
@@ -89,7 +143,19 @@ class Point():
         return Point((self.lon_degrees,self.lat_degrees))
 
 def box_covering(lon,lat,hack_branchcut_threshold=-1):
-    """Make a BB covering, arguments (lon,lat) are arrays of lat and lon in degrees."""
+    """Make a BB covering, arguments (lon,lat) are arrays of lat and lon in degrees.
+
+    Make the assumption that we are dealing with compact clouds of
+    points like you'll get in a granule. We'll detect those that cross
+    the dateline by checking if the extent of the cloud exceeds some
+    threshold.
+
+    hack_branchcut_threshold is a start at handling the lon=+/-180
+    periodic boundary.  If hack_branchcut_threshold > 0 and the extent
+    of lon exceeds this threshold, then add 360 to bring the minimum
+    around to the right sheet.
+
+    """
     if hack_branchcut_threshold > 0:
         lon0=np.nanmin(lon)
         lon1=np.nanmax(lon)
@@ -108,7 +174,7 @@ def box_covering(lon,lat,hack_branchcut_threshold=-1):
     return BoundingBox(( Point((np.nanmin(lon),np.nanmin(lat)))\
                          ,Point((np.nanmax(lon),np.nanmax(lat))) ))
 
-class BoundingBox():
+class BoundingBox(object):
     p0 = None; p1 = None
     def __init__(self):
         """A box."""
@@ -121,7 +187,7 @@ class BoundingBox():
     def init(self,p=(Point(),Point())):
         self.p0 = p[0]
         self.p1 = p[1]
-        self.lon_interval = Interval([self.p0.lon_degrees, self.p1.lon_degrees])
+        self.lon_interval = LonInterval([self.p0.lon_degrees, self.p1.lon_degrees])
         self.lat_interval = Interval([self.p0.lat_degrees, self.p1.lat_degrees])
     def copy(self):
         """Return a deep copy of this object."""
@@ -167,8 +233,8 @@ class BoundingBox():
         if other_box.emptyp():
             return BoundingBox()
         
-        lon_overlap = self.lon_interval.overlap(other_box.lon_interval)
-        if lon_overlap.emptyp():
+        lon_overlaps = self.lon_interval.overlap(other_box.lon_interval)
+        if lon_overlaps[0].emptyp():
             return BoundingBox()
         
         lat_overlap = self.lat_interval.overlap(other_box.lat_interval)
@@ -183,8 +249,12 @@ class BoundingBox():
         if o_lat_interval.emptyp():
             return BoundingBox()
 
-        return BoundingBox(( Point((lon_overlap.x0,lat_overlap.x0))\
-                           ,Point((lon_overlap.x1,lat_overlap.x1)) ))
+        return \
+              [BoundingBox( (Point((lon.x0,lat_overlap.x0))\
+                             ,Point((lon.x1,lat_overlap.x1))) ) for lon in lon_overlaps ]
+               
+#        return BoundingBox(( Point((lon_overlaps.x0,lat_overlap.x0))\
+#                           ,Point((lon_overlaps.x1,lat_overlap.x1)) ))
 
     def lons_lats(self):
         if self.emptyp():
@@ -218,7 +288,7 @@ class BoundingBox():
         lon,lat=p.inDegrees()
         return self.lon_interval.contains(lon) and self.lat_interval.contains(lat)
 
-class MODIS_DataField():
+class MODIS_DataField(object):
     """Access a datafield in a MODIS file"""
     key_along  ='Cell_Along_Swath_5km:mod05'
     key_across ='Cell_Across_Swath_5km:mod05'
@@ -443,7 +513,7 @@ class TestPoint(unittest.TestCase):
         self.assertEqual((None,None),Interval().tuple())
         self.assertEqual((0,1),Interval([0,1]).tuple())
         self.assertEqual([1,2],Interval(lst=[1,2]).list())
-        self.assertEqual([1,2],Interval([2,1]).list())
+        self.assertEqual([2,1],Interval([2,1]).list())
 
     def test_IntervalEmpty(self):
         self.assertEqual(False,Interval([0,1]).emptyp())
@@ -462,6 +532,32 @@ class TestPoint(unittest.TestCase):
     def test_contains(self):
         self.assertEqual(True,Interval([0.0,1.0]).contains(0.5))
         self.assertEqual(False,Interval([0.0,1.0]).contains(1.5))
+        self.assertEqual(True,Interval([175,180]).contains(180))
+        self.assertEqual(True,Interval([-180,-175]).contains(-180))
+
+    def test_LonInterval(self):
+        self.assertEqual([0,1],LonInterval([0,1]).list())
+        self.assertEqual([175,-175],LonInterval([175,-175]).list())
+        self.assertEqual([-180,-175],LonInterval([175,-175]).to_Intervals()[0].list())
+        self.assertEqual([175,180],LonInterval([175,-175]).to_Intervals()[1].list())
+        self.assertEqual(180,LonInterval([175,-175]).centroid())
+        self.assertEqual(True,LonInterval([175,-175]).contains(180))
+        self.assertEqual(True,LonInterval([175,-175]).contains(-178))
+        self.assertEqual(False,LonInterval([175,-175]).contains(-174))
+
+    def test_LonIntervalOverlap(self):
+        self.assertEqual(1,len(LonInterval([175.0,-175.0]).overlap(LonInterval([-177,-170]))))
+        self.assertEqual([-177,-175.0],LonInterval([175.0,-175.0]).overlap(LonInterval([-177,-170]))[0].list())
+        self.assertEqual(0,len(LonInterval([175.0,-175.0]).overlap(LonInterval([-173,-170]))))
+        self.assertEqual(1,len(LonInterval([175.0,-175.0]).overlap(LonInterval([ 170, 176]))))
+        self.assertEqual([175.0,176],LonInterval([175.0,-175.0]).overlap(LonInterval([ 170, 176]))[0].list())
+        self.assertEqual(2,len(LonInterval([175.0,-175.0]).overlap(LonInterval([ 177,-178]))))
+        self.assertEqual([-180,-178],LonInterval([175.0,-175.0]).overlap(LonInterval([ 177,-178]))[0].list())
+        self.assertEqual([177,180],LonInterval([175.0,-175.0]).overlap(LonInterval([ 177,-178]))[1].list())
+        self.assertEqual([-180,-175.0],LonInterval([175.0,-175.0]).overlap(LonInterval([ 170,-170]))[0].list())
+        self.assertEqual([175.0,180],LonInterval([175.0,-175.0]).overlap(LonInterval([ 170,-170]))[1].list())
+        self.assertEqual([-178,-175.0],LonInterval([175.0,-175.0]).overlap(LonInterval([-178, 178]))[0].list())
+        self.assertEqual([175.0,178],LonInterval([175.0,-175.0]).overlap(LonInterval([-178, 178]))[1].list())
         
     def test_BoundingBox(self):
         # print '\n'+BoundingBox().to_xml()
@@ -484,7 +580,7 @@ class TestPoint(unittest.TestCase):
                          +'</BoundingBox>\n'\
                          ,BoundingBox((Point((0,0)),Point((1,1))))\
                          .overlap(BoundingBox((Point((0.5,0.25)),Point((1.5,1.5)))))\
-                         .to_xml())
+                         [0].to_xml())
         self.assertEqual('<Point lon_degrees=0.5 lat_degrees=0.5/>'\
                          ,BoundingBox((Point((0,0)),Point((1,1)))).centroid().to_xml())
 
@@ -521,14 +617,14 @@ class TestPoint(unittest.TestCase):
                          +'  <Point lon_degrees=165.0 lat_degrees=50.0/>\n'\
                          +'</BoundingBox>\n'\
                          ,box_covering([-165.0,165],[40.0,50.0]).to_xml())
-        self.assertEqual('<BoundingBox>\n'\
-                         +'  <Point lon_degrees=-180.0 lat_degrees=40.0/>\n'\
-                         +'  <Point lon_degrees=180.0 lat_degrees=50.0/>\n'\
-                         +'</BoundingBox>\n'\
-                         ,box_covering([-165.0,165.0],[40.0,50.0]\
-                                       ,hack_branchcut_threshold=180.0).to_xml())
-
         
+        self.assertEqual('<BoundingBox>\n'\
+                         +'  <Point lon_degrees=165.0 lat_degrees=40.0/>\n'\
+                         +'  <Point lon_degrees=185.0 lat_degrees=50.0/>\n'\
+                         +'</BoundingBox>\n'\
+                         ,box_covering([165.0,-175.0],[40.0,50.0]\
+                         ,hack_branchcut_threshold=250).to_xml())
+
 
     def test_MODIS_bbox(self):
         SRC_DIRECTORY=data_src_directory()+'MODIS/'
@@ -547,14 +643,14 @@ class TestPoint(unittest.TestCase):
         # print test_modis_obj_0.bbox.overlap(test_modis_obj_1.bbox).to_xml()
         # print test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox).to_xml()
         self.assertEqual( '<BoundingBox>\n'\
-                          +'  <Point lon_degrees=-125.555 lat_degrees=16.4271/>\n'\
-                          +'  <Point lon_degrees=-108.908 lat_degrees=34.1759/>\n'\
+                          +'  <Point lon_degrees=-125.55471 lat_degrees=16.427057/>\n'\
+                          +'  <Point lon_degrees=-108.90769 lat_degrees=34.175877/>\n'\
                           +'</BoundingBox>\n'\
-                          ,test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox).to_xml() )
+                          ,test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox)[0].to_xml() )
 
         self.assertEqual( '<BoundingBox>\n'\
-                          +'  <Point lon_degrees=-135.695 lat_degrees=13.1476/>\n'\
-                          +'  <Point lon_degrees=-98.0147 lat_degrees=37.4734/>\n'\
+                          +'  <Point lon_degrees=-135.69511 lat_degrees=13.147603/>\n'\
+                          +'  <Point lon_degrees=-98.01473 lat_degrees=37.473373/>\n'\
                           +'</BoundingBox>\n'\
                           ,test_modis_obj_1.bbox.union(test_modis_obj_0.bbox).to_xml() )
         
@@ -573,11 +669,11 @@ class TestPoint(unittest.TestCase):
                          .overlap(BoundingBox((Point((0,0)),Point((1.0,1.0)))))
         # print 'a: ',a.to_xml()
         
-        self.assertEqual(False,a.emptyp())
+        self.assertEqual(False,a[0].emptyp())
 
         self.assertEqual(False\
                          ,BoundingBox((Point((0,0)),Point((1.0,1.0))))\
-                         .overlap(BoundingBox((Point((0,0)),Point((1.0,1.0))))).emptyp())
+                         .overlap(BoundingBox((Point((0,0)),Point((1.0,1.0)))))[0].emptyp())
 
         globeBox=BoundingBox((Point((-180.0,-90.0)),Point((180.0,90.0))))
         SRC_DIRECTORY=data_src_directory()+'MODIS/'
@@ -587,15 +683,15 @@ class TestPoint(unittest.TestCase):
                                         ,srcdirname=SRC_DIRECTORY\
                                         )
         b=globeBox.overlap(test_modis_obj_0.bbox)
-        self.assertEqual(False,b.emptyp())
-        self.assertEqual(False,globeBox.overlap(test_modis_obj_0.bbox).emptyp())
+        self.assertEqual(False,b[0].emptyp())
+        self.assertEqual(False,globeBox.overlap(test_modis_obj_0.bbox)[0].emptyp())
         # print 't',test_modis_obj_0.bbox.to_xml()
         # print 'g',globeBox.to_xml()
         # print 'b',b.to_xml()
         # The following is the key to the bug.
         obj_bb=BoundingBox().from_json(test_modis_obj_0.bbox.to_json())
         self.assertEqual(False,obj_bb.emptyp())
-        self.assertEqual(False,globeBox.overlap(obj_bb).emptyp())
+        self.assertEqual(False,globeBox.overlap(obj_bb)[0].emptyp())
         
 def demo_modis_obj(show=False):
     if not show:
