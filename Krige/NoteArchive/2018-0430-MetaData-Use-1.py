@@ -8,7 +8,7 @@
 import json
 import os
 import sys
-from MODIS_DataField import MODIS_DataField, BoundingBox, Point, box_covering, Polygon
+from MODIS_DataField import MODIS_DataField, BoundingBox, Point, box_covering, Polygon, data_src_directory
 
 import numpy as np
 import matplotlib as mpl
@@ -18,13 +18,13 @@ from mpl_toolkits.basemap import Basemap
 _verbose=True
 _debug=False
 
-if('NOGGIN_DATA_SRC_DIRECTORY' in os.environ):
-    SRC_DIRECTORY_BASE=os.environ['NOGGIN_DATA_SRC_DIRECTORY']
-else:
-    SRC_DIRECTORY_BASE='./'
+#if('NOGGIN_DATA_SRC_DIRECTORY' in os.environ):
+#    SRC_DIRECTORY_BASE=os.environ['NOGGIN_DATA_SRC_DIRECTORY']
+#else:
+#    SRC_DIRECTORY_BASE='./'
 
+SRC_DIRECTORY_BASE=data_src_directory()
 SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS-61/'
-
 SRC_METADATA=SRC_DIRECTORY+'modis_BoundingBoxes.json'
 
 print 'loading '+SRC_METADATA
@@ -105,14 +105,14 @@ for i,v in src_data.iteritems():
             v_lons,v_lats = vp.polygon()
             draw_screen_poly( v_lons, v_lats, m, facecolor='black', edgecolor='red' )
 
-
-roi_box = BoundingBox(( Point((  175, -30.0))\
-                       ,Point(( -175, -40.0))))
-
-roi_poly = roi_box.polygon()
-for rp in roi_poly:
-    r_lons,r_lats = rp.polygon()
-    draw_screen_poly( r_lons, r_lats, m, facecolor='black', edgecolor='blue' )
+plot_test_box=False
+if plot_test_box:
+    roi_box = BoundingBox(( Point((  175, -30.0))\
+                            ,Point(( -175, -40.0))))
+    roi_poly = roi_box.polygon()
+    for rp in roi_poly:
+        r_lons,r_lats = rp.polygon()
+        draw_screen_poly( r_lons, r_lats, m, facecolor='black', edgecolor='blue' )
 
 
 plt.show()
