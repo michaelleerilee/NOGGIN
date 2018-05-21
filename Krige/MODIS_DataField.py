@@ -453,7 +453,7 @@ class MODIS_DataField(object):
                         ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center\
                         ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
         self.m.drawcoastlines(linewidth=0.5)
-        self.m.drawparallels(np.arange(50., 91., 10.), labels=[1, 0, 0, 0])
+        self.m.drawparallels(np.arange(-90.0, 91., 10.), labels=[1, 0, 0, 0])
         self.m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
 
     def show(self):

@@ -61,10 +61,12 @@ def adaptive_index(x0,y0,x,y,npts=100,beta0=200,frac=0.1,distribution='normal',l
         else:
             beta=beta*(1.0-frac)
             if beta/beta0 < 0.00001 or iter > 1000:
-                raise ValueError('Too many iterations, beta too small.'\
-                                     +' size='+str(idx_size)\
-                                     +' iter='+str(iter)\
-                                     )
+                # fail silently
+                return idx                
+                # raise ValueError('Too many iterations, beta too small.'\
+                #                      +' size='+str(idx_size)\
+                #                      +' iter='+str(iter)\
+                #                      )
     return idx
 
 def span_array(a):

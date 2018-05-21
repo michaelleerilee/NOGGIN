@@ -59,6 +59,20 @@ class krigeResults(object):
             self.box = mdf.BoundingBox()
         self.note = str(note)
         self.construct_hull()
+        self.sort_on_longitude()
+    def sort_on_longitude(self):
+        """Sort data to avoid bug in basemap. TODO: move into __init__."""
+        if self.x is not None \
+           and self.y is not None \
+           and self.z is not None:
+            idx = self.x.argsort()
+            self.y = self.y[idx[::-1]]
+            self.z = self.z[idx[::-1]]
+            self.x = self.x[idx[::-1]]
+            # self.y = [y for _,y in sorted(zip(self.x,self.y))]
+            # self.z = [z for _,z in sorted(zip(self.x,self.z))]
+            # self.x = sorted(self.x)
+        # else fail silently
     def clear(self):
         self.x = None
         self.y = None
@@ -102,6 +116,8 @@ krige_results = []
 dLon = 20
 dLat = 10
 for iLon in range(-180,180,dLon):
+#     for jLat in range(-90,90,dLat):
+# for iLon in range(-180,-180+dLon,dLon):
     for jLat in range(-90,90,dLat):
         print 'loading iLon,jLat: '+str(iLon)+','+str(jLat)
         print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
@@ -222,8 +238,8 @@ for iLon in range(-180,180,dLon):
         colormap_1 = plt.cm.gist_yarg
         colormap_2 = plt.cm.plasma
         colormap_x = colormap_0
-        # vmin=1.0; vmax=5.0
-        vmin=np.nanmin(data1); vmax=np.nanmax(data1)
+        vmin=1.0; vmax=5.0
+        # vmin=np.nanmin(data1); vmax=np.nanmax(data1)
 
         gridz, data_x, data_y, data_z = noggin.drive_OKrige(\
                                                             grid_stride=dg\
@@ -250,56 +266,57 @@ for iLon in range(-180,180,dLon):
         # grid_hull = ConvexHull(xy1)
         kr = krige_result
 
-print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
-print 'plot results'
-#### PLOT RESULTS ####
-#
-# fig = plt.gcf()
-fig_gen = noggin.fig_generator(1,1)
-fig,ax = plt.subplots(1,1)
-_scale = 2.0*np.pi
-wh_scale = [_scale,_scale]
-lon_0,lat_0 = krigeBox.centroid().inDegrees()
-# m = Basemap(projection='laea', resolution='l', lat_ts=65\
-    #            ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
-m = Basemap(projection='cyl',resolution='h'\
-            ,ax=ax\
-            ,lat_0=lat_0, lon_0=lon_0)
-m.drawcoastlines(linewidth=0.5)
-m.drawparallels(np.arange(50., 91., 10.), labels=[1, 0, 0, 0])
-m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
+## print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
+## print 'plot results'
+## #### PLOT RESULTS ####
+## #
+## # fig = plt.gcf()
+## fig_gen = noggin.fig_generator(1,1)
+## fig,ax = plt.subplots(1,1)
+## _scale = 2.0*np.pi
+## wh_scale = [_scale,_scale]
+## lon_0,lat_0 = krigeBox.centroid().inDegrees()
+## # m = Basemap(projection='laea', resolution='l', lat_ts=65\
+##     #            ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
+## m = Basemap(projection='cyl',resolution='h'\
+##             ,ax=ax\
+##             ,lat_0=lat_0, lon_0=lon_0)
+## m.drawcoastlines(linewidth=0.5)
+## m.drawparallels(np.arange(50., 91., 10.), labels=[1, 0, 0, 0])
+## m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
+## 
+## # if _plot_source_data_outside_grid:
+## #     modis_obj_2 = mdf.MODIS_DataField(\
+## #                                       data=data1[ex_grid]\
+## #                                       ,latitude=latitude1[ex_grid]\
+## #                                       ,longitude=longitude1[ex_grid])
+## #     modis_obj_2.scatterplot(m=m\
+## #                             ,title='scatter'\
+## #                             ,plt_show = False\
+## #                             ,vmin=vmin,vmax=vmax\
+## #                             ,cmap=colormap_x\
+## #     )
+##         
+## if _plot_kriged:
+##     for kr in krige_results:
+##         #
+##         # m = modis_obj_2.get_m()
+##         m.drawmapboundary(fill_color='dimgrey')
+##         # m.scatter(gridx,gridy,c=gridz
+##         m.scatter(kr.x,kr.y,c=kr.z\
+##                   ,cmap=colormap_x\
+##                   ,linewidth=0\
+##                   ,alpha=m_alpha\
+##                   ,latlon=True\
+##                   ,vmin=vmin, vmax=vmax\
+##                   ,edgecolors=None\
+##                   ,s=marker_size*10\
+##                   ,marker='s'\
+##         )
+##         if _plot_kriged_outline:
+##             noggin.draw_screen_poly( kr.x[kr.hull.vertices], kr.y[kr.hull.vertices], m )
+##
 
-# if _plot_source_data_outside_grid:
-#     modis_obj_2 = mdf.MODIS_DataField(\
-#                                       data=data1[ex_grid]\
-#                                       ,latitude=latitude1[ex_grid]\
-#                                       ,longitude=longitude1[ex_grid])
-#     modis_obj_2.scatterplot(m=m\
-#                             ,title='scatter'\
-#                             ,plt_show = False\
-#                             ,vmin=vmin,vmax=vmax\
-#                             ,cmap=colormap_x\
-#     )
-        
-if _plot_kriged:
-    for kr in krige_results:
-        #
-        # m = modis_obj_2.get_m()
-        m.drawmapboundary(fill_color='dimgrey')
-        # m.scatter(gridx,gridy,c=gridz
-        m.scatter(kr.x,kr.y,c=kr.z\
-                  ,cmap=colormap_x\
-                  ,linewidth=0\
-                  ,alpha=m_alpha\
-                  ,latlon=True\
-                  ,vmin=vmin, vmax=vmax\
-                  ,edgecolors=None\
-                  ,s=marker_size*10\
-                  ,marker='s'\
-        )
-        if _plot_kriged_outline:
-            noggin.draw_screen_poly( kr.x[kr.hull.vertices], kr.y[kr.hull.vertices], m )
-            
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 print 'plt.show'
 if True:
