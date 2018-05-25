@@ -1,6 +1,25 @@
 
+Development notes.  ML Rilee, RSTLLC, mike@rilee.net
 
-* 2018-0417-1408-32-EDT ML Rilee, RSTLLC, mike@rilee.net.
+* 2018-0522-1123 Krige Sketching and plotting
+
+Build the calculation for kriging the whole planet. Separated
+calculation from plotting, since the latter requires more rapid
+iterations in actual use.
+
+** 2018-0518-KrigeSketch-1.py
+Iterate over the tiled planet, kriging the tiles from our data source.
+
+Lots of debugging switches. _capture* is used to capture a single
+tile for later analysis via the KrigeSketchPlot scripts.
+
+** 2018-0519-KrigeSketchPlot-1.py
+Plot the whole tiled Earth using data from KrigeSketch.
+
+** 2018-0521-KrigeSketchPlot-1.py
+Plot a single tile and related information from KrigeSketch for debugging.
+
+* 2018-0417-1408-32-EDT ML Rilee, RSTLLC, mike@rilee.net. provenance
 
 provenance
 

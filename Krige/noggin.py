@@ -79,9 +79,14 @@ def center_array(a):
 
 # https://stackoverflow.com/questions/12251189/how-to-draw-rectangles-on-a-basemap
 
-def draw_screen_poly( lons, lats, m ):
+def draw_screen_poly( lons, lats, m, facecolor='black', edgecolor='black' ):
     x, y = m( lons, lats )
-    plt.gca().add_patch(Polygon( zip(x,y), facecolor='black', alpha=0.8, fill=False ))
+    plt.gca().add_patch( Polygon( zip(x,y)\
+                                  ,facecolor=facecolor\
+                                  ,edgecolor=edgecolor\
+                                  ,alpha=0.8\
+                                  ,fill=False\
+                                  ))
 
 ###########################################################################
 
@@ -268,6 +273,7 @@ def drive_OKrige(
             isample = range(i,min(i+grid_stride,x.size))
         g_lon = x[isample]
         g_lat = y[isample]
+        # l,w form a window from which to sample.
         idx = adaptive_index(
             center_array(g_lon)
             ,center_array(g_lat)

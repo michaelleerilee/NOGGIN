@@ -500,11 +500,12 @@ class MODIS_DataField(object):
             self.m = save_m
 
     def scatterplot(self,m=None,vmin=np.nan,vmax=np.nan\
-                        ,plt_show=True,ax=None\
-                        ,marker_size=1\
-                        ,colorbar=False,title=None\
-                        ,cmap=None\
-                        ):
+                    ,plt_show=True,ax=None\
+                    ,marker_size=1\
+                    ,colorbar=False,title=None\
+                    ,cmap=None\
+                    ,value_map=None\
+    ):
         # Render the plot in a lambert equal area projection.
         save_m = None
         if m is None:
@@ -520,17 +521,34 @@ class MODIS_DataField(object):
             vmax = np.nanmax(self.data)
 
         sc = None
-        if cmap is None:
-            sc = self.m.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
-                               ,vmin=vmin,vmax=vmax\
-                               ,s=marker_size\
-                               )
+        if value_map is None:
+            if cmap is None:
+                sc = self.m.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
+                                    ,vmin=vmin,vmax=vmax\
+                                    ,s=marker_size\
+                )
+            else:
+                sc = self.m.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
+                                    ,vmin=vmin,vmax=vmax\
+                                    ,s=marker_size\
+                                    ,cmap=cmap
+                )
         else:
-            sc = self.m.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
-                               ,vmin=vmin,vmax=vmax\
-                               ,s=marker_size\
-                               ,cmap=cmap
-                               )
+            if cmap is None:
+                sc = self.m.scatter(self.longitude, self.latitude\
+                                    ,c=value_map(self.data)\
+                                    ,latlon=True\
+                                    ,vmin=vmin,vmax=vmax\
+                                    ,s=marker_size\
+                )
+            else:
+                sc = self.m.scatter(self.longitude, self.latitude\
+                                    ,c=value_map(self.data)\
+                                    ,latlon=True\
+                                    ,vmin=vmin,vmax=vmax\
+                                    ,s=marker_size\
+                                    ,cmap=cmap
+                )
             
         # self.m.pcolormesh(self.longitude, self.latitude, self.data, latlon=True\
         #                 ,vmin=vmin,vmax=vmax)

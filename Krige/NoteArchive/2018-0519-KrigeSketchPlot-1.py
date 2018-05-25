@@ -42,9 +42,12 @@ colormap_x = colormap_0
 # vmin=2.0; vmax=20.0
 # vmin=2.0; vmax=10.0
 # vmin=0.5; vmax=8.0
-vmin=0.25; vmax=6.0
+# vmin=0.25; vmax=6.0
 # vmin=0.5; vmax=5.0
 # vmin=np.nanmin(data1); vmax=np.nanmax(data1)
+# For log10
+# vmin=-2.0; vmax=1.0
+vmin=-2.0; vmax=1.25
 
 
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
@@ -56,7 +59,8 @@ fig_gen = noggin.fig_generator(1,1)
 fig,ax = plt.subplots(1,1)
 _scale = 2.0*np.pi
 wh_scale = [_scale,_scale]
-lon_0,lat_0 = krigeBox.centroid().inDegrees()
+# lon_0,lat_0 = krigeBox.centroid().inDegrees()
+lon_0,lat_0 = (0,0)
 # m = Basemap(projection='laea', resolution='l', lat_ts=65\
     #            ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
 m = Basemap(projection='cyl',resolution='h'\
@@ -81,13 +85,13 @@ m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
 m.drawmapboundary(fill_color='dimgrey')
 
 _plot_from_list = False
-_plot_list=[144]
+_plot_list=[49]
 _plot_item=True
 _plot_kriged_data_index = True
 
 if _plot_kriged:
     k=0
-    for kr in krige_results:
+    for kr in krigeSketch_results:
         sys.stdout.write('k = '+str(k))
         if _plot_from_list:
             if k in _plot_list:
@@ -103,7 +107,10 @@ if _plot_kriged:
             # z1 = [z for _,z in sorted(zip(kr.x,kr.z))]
             # x1 = sorted(kr.x)
             # m.scatter(x1,y1,c=z1
-            m.scatter(kr.x,kr.y,c=kr.z\
+            # m.scatter(kr.x,kr.y,c=kr.z\
+            # m.scatter(kr.x,kr.y,c=np.log10(kr.z+1.0e-9)\
+            # m.scatter(kr.x,kr.y,c=kr.z\
+            m.scatter(kr.x,kr.y,c=np.log10(kr.z+1.0e-9)\
                       ,cmap=colormap_x\
                       ,linewidth=0\
                       ,alpha=m_alpha\
@@ -118,8 +125,8 @@ if _plot_kriged:
             if _plot_kriged_data_index:
                 # xt, yt = m( np.sum(kr.x)/kr.x.size, np.sum(kr.y)/kr.y.size )
                 xt, yt = m( np.nanmin(kr.x), np.sum(kr.y)/kr.y.size )
-                if xt < 0.0:
-                    xt = xt+360.0
+                #if xt < 0.0:
+                #    xt = xt+360.0
                 # xt, yt = ( np.sum(kr.x)/kr.x.size, np.sum(kr.y)/kr.y.size )
                 plt.text(xt,yt,str(k),color='green')
         # sys.stdout.write(', plotting');
