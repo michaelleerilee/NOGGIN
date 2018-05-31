@@ -139,12 +139,14 @@ dLat = 30
 dSearch = 0.75*dLon
 k = -1
 #+
+### Loop over the tiles.
+### 
 for iLon in range(-180,180,dLon):
 # for iLon in range(-180,-180+dLon,dLon):
 #     for jLat in range(-90,90,dLat):
 #+    for jLat in range(-90,90,dLat):
 #    for jLat in range(-90,-90+dLat,dLat):
-    for jLat in range(-90,90,dLat):    
+    for jLat in range(-90,90,dLat):
         k=k+1
         _calculate = False
         if not _capture_only:

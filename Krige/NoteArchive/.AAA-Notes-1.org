@@ -1,13 +1,41 @@
 
 Development notes.  ML Rilee, RSTLLC, mike@rilee.net
 
+* 2018-0530-2113 KrigeSketch and supporting scripts
+
+** 2018-0518-KrigeSketch-1.py - krige the planet
+Iterate over the tiled planet, kriging the tiles from our data source.
+
+Lots of debugging switches. _capture* is used to capture a single
+tile for later analysis via the KrigeSketchPlot scripts.
+
+Provides the class krigeResults to aid the iteration over and
+collection of results.
+
+Loads metadata collected by 2018-0330-MetaData-1.py.
+
+Can capture a tile and associated data for debugging.
+
+** 2018-0519-KrigeSketchPlot-1.py - graph the kriged planet
+Graph the whole tiled Earth using data from KrigeSketch.
+
+** 2018-0521-KrigeSketchPlot-1.py - graph data associated with a captured tile
+Plot a single tile and related information from KrigeSketch for debugging.
+
+** 2018-0524-SourceDataSketch-1.py - graph the source data, all of it
+Plot the source data.  All of it.
+
+** 2018-0330-MetaData-1.py - collect the metadata from the source files
+
+** MODIS_DataField.py provides BoundingBox and HDF access functions
+
 * 2018-0529-1515 Krige parameterizations
 
 ** Variogram modelling
 
+variogram_model
 variogram_function
 variogram_parameters
-
 nlags
 
 ** Arguments to drive_OKrige -- Ordinary Kriging
@@ -28,7 +56,7 @@ calculated in multiple steps.
 
 Note: currently, adaptive_index is always called.
 
-*** grid_stride
+*** grid_stride - integer - krige over subarrays of the target
 controls the number of times we iterate over the target grid. The
 routine uses sub-arrays of the input target grid, chosen by stepping
 through the the full target with grid_stride.
@@ -75,7 +103,7 @@ any separate fitting step.
 
 Passed to OrdinaryKriging.
 
-*** variogram_function
+*** variogram_function - callable, 2 arguments (parameters, distances)
 This is the callable function used to model the variogram for the kriging
 calculation. As stated in PyKrige's documentation, it takes 2
 arguments: (1) a list, variogram_parameters described above, and
@@ -92,9 +120,15 @@ Passed to OrdinaryKriging.
 *** enable_plotting - boolean - optional - graph the variogram model
 Passed to OrdinaryKriging.
 
+Not so useful when iterating.
 
+*** npts - integer - minimum number of points for v'gram calc. passed to adaptive_index
+*** beta0 - float - scale for random sampling - passed to adaptive_index
+*** frac - float - scale for changing (adapting) sampling - passed to adaptive_index
+*** l,w - bounding box dimensions, 1/2-length and 1/2-width - passed to adaptive_index
 ** Functions supporting drive_OKrige
 *** adaptive_index - constructs index for subsampling
+**** Notes 
 Attempts to come up with an index subsampling the source data, such
 that the subsampled set is larger than a minimum number of points
 (npts). If it fails, it returns its current subsampling index.
@@ -141,6 +175,7 @@ Plot the whole tiled Earth using data from KrigeSketch.
 
 ** 2018-0521-KrigeSketchPlot-1.py
 Plot a single tile and related information from KrigeSketch for debugging.
+
 
 * 2018-0417-1408-32-EDT ML Rilee, RSTLLC, mike@rilee.net. provenance
 

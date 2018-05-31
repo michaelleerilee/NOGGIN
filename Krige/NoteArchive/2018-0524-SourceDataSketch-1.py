@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+"""
+
+Graph the source data.
+
+ML Rilee, RSTLLC, mike@rilee.net for NASA/ACCESS-15/NOGGIN.
+
+"""
 
 import json
 import math
