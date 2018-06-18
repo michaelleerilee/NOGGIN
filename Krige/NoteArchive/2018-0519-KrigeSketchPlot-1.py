@@ -26,8 +26,10 @@ from scipy.spatial import ConvexHull
 _verbose=True
 _debug  =True
 
-_plot_source_data_outside_grid = False
 _plot_kriged                   = True
+_plot_source_data_outside_grid = False
+_plot_source_data              = False
+_plot_kriged_data              = True
 _plot_kriged_outline           = False
 _plot_variogram                = False
 
@@ -109,17 +111,18 @@ if _plot_kriged:
             # m.scatter(x1,y1,c=z1
             # m.scatter(kr.x,kr.y,c=kr.z\
             # m.scatter(kr.x,kr.y,c=np.log10(kr.z+1.0e-9)\
-            # m.scatter(kr.x,kr.y,c=kr.z\
-            m.scatter(kr.x,kr.y,c=np.log10(kr.z+1.0e-9)\
-                      ,cmap=colormap_x\
-                      ,linewidth=0\
-                      ,alpha=m_alpha\
-                      ,latlon=True\
-                      ,vmin=vmin, vmax=vmax\
-                      ,edgecolors=None\
-                      ,s=marker_size*10\
-                      ,marker='s'\
-            )
+            # m.scatter(kr.x,kr.y,c=kr.z
+            if _plot_kriged_data:
+                m.scatter(kr.x,kr.y,c=np.log10(kr.z+1.0e-9)\
+                          ,cmap=colormap_x\
+                          ,linewidth=0\
+                          ,alpha=m_alpha\
+                          ,latlon=True\
+                          ,vmin=vmin, vmax=vmax\
+                          ,edgecolors=None\
+                          ,s=marker_size*10\
+                          ,marker='s'\
+                )
             if _plot_kriged_outline:
                 noggin.draw_screen_poly( kr.x[kr.hull.vertices], kr.y[kr.hull.vertices], m )
             if _plot_kriged_data_index:
@@ -129,6 +132,21 @@ if _plot_kriged:
                 #    xt = xt+360.0
                 # xt, yt = ( np.sum(kr.x)/kr.x.size, np.sum(kr.y)/kr.y.size )
                 plt.text(xt,yt,str(k),color='green')
+            if _plot_source_data:
+                
+                modis_obj_2 = mdf.MODIS_DataField(\
+                                                  data=np.log10(kr.src_z+1.0e-9)\
+                                                  ,latitude=kr.src_y\
+                                                  ,longitude=kr.src_x\
+                )
+                modis_obj_2.scatterplot(m=m\
+                                        ,title='scatter'\
+                                        ,plt_show = False\
+                                        ,vmin=vmin,vmax=vmax\
+                                        ,cmap=colormap_x\
+                                        ,marker_size=marker_size*10\
+                )
+                
         # sys.stdout.write(', plotting');
         print '.'
         k=k+1

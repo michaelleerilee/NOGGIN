@@ -3,6 +3,16 @@
 
 2018-0518-1923 ML Rilee, RSTLLC, mike@rilee.net
 
+Important parameters.
+
+* Tile sizes
+** The size of each individual tile.
+dLon
+dLat
+** The amount to add to each dimension when selecting data to load.
+dSearch
+
+
 """
 
 import json
@@ -23,8 +33,21 @@ from mpl_toolkits.basemap import Basemap
 
 from scipy.spatial import ConvexHull
 
+import time
+
+start_time = time.time()
+
 _verbose=True
 _debug  =True
+
+_drive_OKrige_weight = True
+_drive_OKrige_nlags  = 12
+# _drive_OKrige_nlags  = 6
+_drive_OKrige_verbose = True
+_drive_OKrige_enable_statistics = False
+_drive_OKrige_eps = 1.0e-10
+# 'vectorized' 'loop' 'C'
+_drive_OKrige_backend = 'vectorized'
 
 _plot_source_data_outside_grid = False
 _plot_kriged                   = True
@@ -32,7 +55,7 @@ _plot_kriged_outline           = True
 _plot_variogram                = False
 
 _capture_only      = False
-_capture_k         = 31
+_capture_k         = 17
 # _capture_k         = 0
 _capture_x         = None
 _capture_y         = None
@@ -62,6 +85,7 @@ class krigeResults(object):
                  ,s=None,z=None,x=None,y=None\
                  ,hull=None\
                  ,box=None\
+                 ,vg_parameters=None\
                  ,note='Default note for krigeResults'):
         self.clear()
         if x is not None:
@@ -78,6 +102,8 @@ class krigeResults(object):
             self.box = box.copy()
         else:
             self.box = mdf.BoundingBox()
+        if vg_parameters is not None:
+            self.vg_parameters = vg_parameters
         self.note = str(note)
         self.sort_on_longitude()
         self.construct_hull()
@@ -113,6 +139,7 @@ class krigeResults(object):
             xy1[:,1] = self.y
             self.hull = ConvexHull(xy1)
 
+print 'KrigeSketch start'
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 # Load the metadata and convert to a dictionary of boxes
 print 'loading metadata '+SRC_METADATA
@@ -140,20 +167,44 @@ dSearch = 0.75*dLon
 k = -1
 #+
 ### Loop over the tiles.
-### 
-for iLon in range(-180,180,dLon):
+# ### FULL
+# for iLon in range(-180,180,dLon):
+#     for jLat in range(-90,90,dLat):
+# ### FULL
+# ### SMALL CENTER
+# for iLon in range(-30,30,dLon):
+#     for jLat in range(-30,30,dLat):
+# ### SMALL CENTER
+# ### SMALL LEFT CORNER
+# for iLon in range(-180,-120,dLon):
+#     for jLat in range(-90,-30,dLat):
+# ### SMALL LEFT CORNER
 # for iLon in range(-180,-180+dLon,dLon):
 #     for jLat in range(-90,90,dLat):
 #+    for jLat in range(-90,90,dLat):
 #    for jLat in range(-90,-90+dLat,dLat):
-    for jLat in range(-90,90,dLat):
+# ### FULL
+lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90
+# ### SMALL CENTER
+# lon0 = -30; lon1 = 30; lat0 = -30; lat1 = 30
+# ### SMALL LEFT CORNER
+# lon0 = -180; lon1 = -120; lat0 = -90; lat1 = -30
+### SMALL LEFT CORNER+1
+# lon0 = -180+15; lon1 = -120+15; lat0 = -90+15; lat1 = -30+15
+### 3x3 LEFT CORNER+1
+# lon0 = -180+15; lon1 = -90+15; lat0 = -90+15; lat1 = -0+15
+
+for iLon in range(lon0,lon1,dLon):
+    for jLat in range(lat0,lat1,dLat):
         k=k+1
         _calculate = False
+        _enable_statistics = _drive_OKrige_enable_statistics
         if not _capture_only:
             _calculate = True
         else:
             if _capture_k == k:
                 _calculate = True
+                _enable_statistics = True
         if _calculate:
             print 'working on tile = '+str(k)
             print 'loading iLon,jLat: '+str(iLon)+','+str(jLat)
@@ -245,7 +296,7 @@ for iLon in range(-180,180,dLon):
     
             # Calculate variogram
     
-            nlags=12
+            nlags=_drive_OKrige_nlags
             custom_args = None
     
             # A gamma-rayleigh distribution
@@ -265,6 +316,11 @@ for iLon in range(-180,180,dLon):
             dx = noggin.span_array(gridx)
             dy = noggin.span_array(gridy)
             dr = math.sqrt(dx*dx+dy*dy)
+
+            # tile 17 ctr: 105W 75N.
+            # (sqrt 1800) -> 42
+            # 75-42 = 33 - check
+            # 75+42 = 117
     
             # smaller beta => tighter sample distribution
             # beta0=0.5*(dr)
@@ -272,45 +328,83 @@ for iLon in range(-180,180,dLon):
             # beta0=1.0*(dr)
             # beta0=1.25*(dr)
             #+ beta0=1.5*(dr)
-            # beta0=1.5*(dr)
             beta0=1.5*(dr)
             # lw_scale = 1.2
             # lw_scale = 1.5
+            # lw_scale = 2.0
+            # lw_scale = 2.25
             lw_scale = 2.5
+            # lw_scale = 3.0
             l=lw_scale*(dx/2)
             w=lw_scale*(dy/2)
             # npts = 1000
-            npts = 1500
-    
+            # npts = 1500
+            # npts = 2000
+            # npts = 2500
+            # npts = 3000
+            # npts = 4000
+            # npts = 5000
+            # npts = 6000
+            # npts = 7000
+            # npts = 8000
+
+            # if k == 11 or k == 17:
+            #     # 27b npts = 8000
+            #     npts = 10000
+            #     # 27c npts = 12000
+            # else:
+            #     # 27.a-c npts = 4000
+            #     npts = 2000
+
+            # 27d hires_calc = [2,5,11,17,49,54,60,71] 12000/2000
+            hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
+            if k in hires_calc:
+                npts = 16000
+            else:
+                # 27.a-c npts = 4000
+                npts = 2000
+                
+            print 'npts( '+str(k)+' ) = '+str(npts)
+            
             marker_size = 3.5
             m_alpha = 1.0
             colormap_0 = plt.cm.rainbow
             colormap_1 = plt.cm.gist_yarg
             colormap_2 = plt.cm.plasma
             colormap_x = colormap_0
+            
             vmin=1.0; vmax=5.0
             # vmin=np.nanmin(data1); vmax=np.nanmax(data1)
+
+            # The 'custom_args' actually used.
+            variogram_parameters = []
     
-            gridz, data_x, data_y, data_z = noggin.drive_OKrige(\
-                                                                grid_stride=dg\
-                                                                ,random_permute=True\
-                                                                ,x=gridx,y=gridy\
-                                                                ,src_x=longitude1\
-                                                                ,src_y=latitude1\
-                                                                ,src_z=data1\
-                                                                ,variogram_model='custom'\
-                                                                ,variogram_parameters=custom_args\
-                                                                ,variogram_function=custom_vg\
-                                                                ,enable_plotting=_plot_variogram
-                                                                ,npts=npts
-                                                                ,beta0=beta0
-                                                                ,frac=0.0
-                                                                ,l=l,w=w
+            gridz, data_x, data_y, data_z\
+                ,variogram_parameters = noggin.drive_OKrige(\
+                                                            grid_stride=dg\
+                                                            ,random_permute=True\
+                                                            ,x=gridx,y=gridy\
+                                                            ,src_x=longitude1\
+                                                            ,src_y=latitude1\
+                                                            ,src_z=data1\
+                                                            ,variogram_model='custom'\
+                                                            ,variogram_parameters=custom_args\
+                                                            ,variogram_function=custom_vg\
+                                                            ,enable_plotting=_plot_variogram\
+                                                            ,enable_statistics=_enable_statistics\
+                                                            ,npts=npts\
+                                                            ,beta0=beta0\
+                                                            ,frac=0.0\
+                                                            ,l=l,w=w\
+                                                            ,weight=_drive_OKrige_weight\
+                                                            ,verbose=_drive_OKrige_verbose\
+                                                            ,eps=_drive_OKrige_eps\
+                                                            ,backend=_drive_OKrige_backend\
             )
     
             # krige_result = krigeResults(x=gridx,y=gridy,z=gridz,box=krigeBox)
             # krigeSketch_results.append(krige_result)
-            krigeSketch_results.append(krigeResults(x=gridx,y=gridy,z=gridz,box=krigeBox))
+            krigeSketch_results.append(krigeResults(x=gridx,y=gridy,z=gridz,box=krigeBox,vg_parameters=variogram_parameters))
             # xy1 = np.zeros((gridz.shape[0],2))
             # xy1[:,0] = gridx
             # xy1[:,1] = gridy
@@ -339,11 +433,24 @@ for iLon in range(-180,180,dLon):
                     print 'ERROR _c_k = '+str(_capture_k)
                     print 'ERROR _c_z != ksr[_c_k]: '+str(np.nanmax(_capture_z))+' != '+str(np.nanmax(np.nanmax(krigeSketch_results[_capture_k].z)))
 
+if _capture_k < len(krigeSketch_results):
+    print '_c_k,mnmx(_capture_z): '+str(_capture_k)+', ( '+str(np.nanmin(_capture_z))+', '+str(np.nanmax(_capture_z))+' )'
+    if _capture_only:
+        print '_c_k,mnmx(kr[c_k].z): '+str(0)+', ( '+str(np.nanmin(krigeSketch_results[0].z))+', '+str(np.nanmax(krigeSketch_results[0].z))+' )'
+    else:
+        print '_c_k,mnmx(kr[c_k].z): '+str(_capture_k)+', ( '+str(np.nanmin(krigeSketch_results[_capture_k].z))+', '+str(np.nanmax(krigeSketch_results[_capture_k].z))+' )'
 
-print '_c_k,mnmx(_capture_z): '+str(_capture_k)+', ( '+str(np.nanmin(_capture_z))+', '+str(np.nanmax(_capture_z))+' )'
-if _capture_only:
-    print '_c_k,mnmx(kr[c_k].z): '+str(0)+', ( '+str(np.nanmin(krigeSketch_results[0].z))+', '+str(np.nanmax(krigeSketch_results[0].z))+' )'
-else:
-    print '_c_k,mnmx(kr[c_k].z): '+str(_capture_k)+', ( '+str(np.nanmin(krigeSketch_results[_capture_k].z))+', '+str(np.nanmax(krigeSketch_results[_capture_k].z))+' )'
+if True:
+    l=0
+    for k in krigeSketch_results:
+        print 'mnmx(k): '+str(l)+': ( '+str(np.nanmin(k.z))+' '+str(np.nanmax(k.z))+str(' )')
+        l=l+1
+    l=0
+    for k in krigeSketch_results:
+        print 'vg_parm: '+str(l)+': '+str(k.vg_parameters)
+        l=l+1
+
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
+end_time = time.time()
+print 'wall clock run time (sec) = '+str(end_time-start_time)
 print 'KrigeSketch done'

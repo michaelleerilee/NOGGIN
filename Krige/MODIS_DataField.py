@@ -352,6 +352,8 @@ class BoundingBox(object):
 
 class MODIS_DataField(object):
     """Access a datafield in a MODIS file"""
+    # TODO Add an object or classes that can handle swath or grid
+    # TODO rename key_*...
     key_along  ='Cell_Along_Swath_5km:mod05'
     key_across ='Cell_Across_Swath_5km:mod05'
     key_units  ='units'
@@ -385,8 +387,22 @@ class MODIS_DataField(object):
             self.plot_lat_m_center = np.nanmean(self.latitude)
             self.plot_lon_m_center = np.nanmean(self.longitude)
 
-
     def load(self):
+        if self.datafilename[0:3] in ["MOD","MYD"]:
+            if self.datafilename[3:5] == '05':
+                self.load05()
+            elif self.datafilename[3:5] == '08':
+                self.load08()
+            else:
+                print 'failed loading '+self.datafilename
+                print 'loading type '+self.datafilename[0:5]+' not supported. returning...'
+                return
+        else:
+            print 'failed loading '+self.datafilename
+            print 'loading type '+self.datafilename[0:3]+' not supported. returning...'
+
+
+    def load05(self):
         hdf = SD(self.srcdirname+self.datafilename, SDC.READ)
         ds  = hdf.select(self.datafieldname)
         # ds_dims = [ds.dimensions()[i] for i in ds.dimensions().keys()]
@@ -433,7 +449,79 @@ class MODIS_DataField(object):
             print('separate geofile with location information not implemented!')
             # TODO implement or raise exception
             
-    def init_basemap(self,ax=None,wh_scale=(1.5,1.5)\
+    def load08(self):
+        # print 'loading M?D08 not implemented'
+        hdf = SD(self.srcdirname+self.datafilename, SDC.READ)
+        ds  = hdf.select(self.datafieldname)
+
+        print 'load08'
+        print 'ds.dimensions(): ',ds.dimensions()
+
+        # long_name="Atmospheric_Water_Vapor_Mean"
+        ### TODO Maybe these do not need to be fields, just local vars
+        self.key_along  = 'YDim:mod08'
+        self.key_across = 'XDim:mod08'
+        
+        self.colormesh_title = self.datafilename
+        
+        nAlong  = ds.dimensions()[self.key_along]
+        nAcross = ds.dimensions()[self.key_across]
+        print '0 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross)
+
+        data = np.zeros((nAlong,nAcross))
+        print 'a data.shape:     '+str(data.shape)
+        print 'd ds.data.shape:  '+str(ds[:,:].astype(np.double).shape)
+        
+        data = ds[0:nAlong,0:nAcross].astype(np.double)
+
+        print '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross)
+        print '2 data.shape:     '+str(data.shape)
+        
+        attrs        = ds.attributes(full=1)
+        lna          = attrs["long_name"]
+        self.long_name    = lna[0]
+        aoa          = attrs["add_offset"]
+        add_offset   = aoa[0]
+        fva          = attrs["add_offset"]
+        _FillValue   = fva[0]
+        sfa          = attrs["scale_factor"]
+        scale_factor = sfa[0]
+        vra          = attrs["valid_range"]
+        valid_min    = vra[0][0]
+        valid_max    = vra[0][1]
+        ua           = attrs[self.key_units]
+        self.units        = ua[0]
+
+        invalid = np.logical_or(data > valid_max, data < valid_min)
+        invalid = np.logical_or(invalid,data == _FillValue)
+        
+        data[invalid] = np.nan
+        data = (data - add_offset) * scale_factor
+        self.data = np.ma.masked_array(data, np.isnan(data))
+
+        if self.geofile == "":
+            lat = hdf.select('YDim')
+            # lat is 1d, since 08 is a grid
+            # self.latitude = lat[:,:]
+            lon = hdf.select('XDim')
+            # lon is 1d, since 08 is a grid
+            # self.longitude = lon[:,:]
+            print 'type(lon): '+str(type(lon))
+            print 'type(lat): '+str(type(lat))
+            print 'lon.shape: '+str(lon[:].shape)
+            print 'lat.shape: '+str(lat[:].shape)
+            
+            self.longitude,self.latitude = np.meshgrid(lon[:],lat[:])
+                                           
+            self.bbox = box_covering(self.longitude,self.latitude\
+                                     ,hack_branchcut_threshold=self.hack_branchcut_threshold\
+                                     )
+        else:
+            print('separate geofile with location information not implemented!')
+            # TODO implement or raise exception
+        
+
+    def init_basemap(self,ax=None,wh_scale=None\
                          ,lat_center=None, lon_center=None
                          ):
         """
@@ -447,11 +535,17 @@ class MODIS_DataField(object):
             self.plot_lon_m_center = np.nanmean(self.longitude)
         else:
             self.plot_lon_m_center = lon_center
+
+        if wh_scale is None:
+            self.m = Basemap(projection='cyl', resolution='l'\
+                             ,ax=ax\
+                             ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center)
+        else:
+            self.m = Basemap(projection='laea', resolution='l', lat_ts=65\
+                             ,ax=ax\
+                             ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center\
+                             ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
         
-        self.m = Basemap(projection='laea', resolution='l', lat_ts=65\
-                        ,ax=ax\
-                        ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center\
-                        ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
         self.m.drawcoastlines(linewidth=0.5)
         self.m.drawparallels(np.arange(-90.0, 91., 10.), labels=[1, 0, 0, 0])
         self.m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])

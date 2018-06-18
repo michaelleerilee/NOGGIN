@@ -1,6 +1,8 @@
 
 Development notes.  ML Rilee, RSTLLC, mike@rilee.net
 
+## One can grep for TODO and note throughout the code for important notes.
+
 * 2018-0530-2113 KrigeSketch and supporting scripts
 
 ** 2018-0518-KrigeSketch-1.py - krige the planet
@@ -89,7 +91,9 @@ partitioning and parallel compuatation.
 Note that for the current project, tiles are passed to this routine,
 drive_OKrige for separate calculation.
 
-*** variogram_model - string - select which variogram function to use
+*** variogram_model - string - select which variogram function to use. 'custom' only
+!!! NOTE ONLY CUSTOM IS ALLOWED AT THIS TIME !!!
+
 This parameter is used to select the variogram function that the
 routine will use. As currently structured, we pass in our gamma-rayleigh
 distribution as a 'custom' model. Passed to OrdinaryKriging.
