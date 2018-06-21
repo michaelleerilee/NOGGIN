@@ -16,6 +16,9 @@ from time import gmtime, strftime
 import noggin
 import MODIS_DataField as mdf
 
+import pykrige
+import pykrige.variogram_models as vm
+
 # from MODIS_DataField import MODIS_DataField, BoundingBox, mdf.Point, box_covering, Polygon, data_src_directory
 
 import numpy as np
@@ -70,7 +73,6 @@ vmin=-2.0; vmax=1.25
 def log_map(x):
     return np.log10(x+1.0e-9)
 
-
 i = "MOD08_D3.A2015304.061.2017323113710.hdf"
 # i = "MYD08_D3.A2015304.061.2018054061429.hdf"
 # long_name="Atmospheric_Water_Vapor_Mean"
@@ -109,7 +111,6 @@ gridss = np.zeros(gridx.shape)
 krigeBox = mdf.BoundingBox((mdf.Point((np.nanmin(gridx),np.nanmin(gridy)))\
                             ,mdf.Point((np.nanmax(gridx),np.nanmin(gridy)))))
                             
-
 dx = noggin.span_array(gridx)
 dy = noggin.span_array(gridy)
 dr = math.sqrt(dx*dx+dy*dy)
@@ -125,6 +126,7 @@ npts = 2000
 
 nlags=_drive_OKrige_nlags
 custom_args = None
+vg_model = 'custom'
 
 # A gamma-rayleigh distribution
 def custom_vg(params,dist):
@@ -143,34 +145,58 @@ variogram_parameters = []
 
 krige_results = []
 
-gridz, data_x, data_y, data_z\
-    ,variogram_parameters = noggin.drive_OKrige(\
-                                                grid_stride=dg\
-                                                ,random_permute=True\
-                                                ,x=gridx,y=gridy\
-                                                ,src_x=longitude1\
-                                                ,src_y=latitude1\
-                                                ,src_z=data1\
-                                                ,variogram_model='custom'\
-                                                ,variogram_parameters=custom_args\
-                                                ,variogram_function=custom_vg\
-                                                ,enable_plotting=_plot_variogram\
-                                                ,enable_statistics=_enable_statistics\
-                                                ,npts=npts\
-                                                ,beta0=beta0\
-                                                ,frac=0.0\
-                                                ,l=l,w=w\
-                                                ,weight=_drive_OKrige_weight\
-                                                ,verbose=_drive_OKrige_verbose\
-                                                ,eps=_drive_OKrige_eps\
-                                                ,backend=_drive_OKrige_backend\
-    )
+krige_results.append(\
+                     noggin.drive_OKrige(\
+                                         grid_stride=dg\
+                                         ,random_permute=True\
+                                         ,x=gridx,y=gridy\
+                                         ,src_x=longitude1\
+                                         ,src_y=latitude1\
+                                         ,src_z=data1\
+                                         ,variogram_model='gamma_rayleigh_nuggetless_variogram_model'\
+                                         ,variogram_function=vm.variogram_models['gamma_rayleigh_nuggetless_variogram_model'].function\
+                                         ,enable_plotting=_plot_variogram\
+                                         ,enable_statistics=_enable_statistics\
+                                         ,npts=npts\
+                                         ,beta0=beta0\
+                                         ,frac=0.0\
+                                         ,l=l,w=w\
+                                         ,weight=_drive_OKrige_weight\
+                                         ,verbose=_drive_OKrige_verbose\
+                                         ,eps=_drive_OKrige_eps\
+                                         ,backend=_drive_OKrige_backend\
+                     ))
 
-krige_results.append(noggin.krigeResults(x=gridx,y=gridy,z=gridz\
-                                         ,src_x=longitude1,src_y=latitude1,src_z=data1\
-                                         ,box=krigeBox,vg_parameters=variogram_parameters\
-))
 
+if False:
+    krige_results.append(\
+                         noggin.drive_OKrige(\
+                                             grid_stride=dg\
+                                             ,random_permute=True\
+                                             ,x=gridx,y=gridy\
+                                             ,src_x=longitude1\
+                                             ,src_y=latitude1\
+                                             ,src_z=data1\
+                                             ,variogram_model=vg_model\
+                                             ,variogram_parameters=custom_args\
+                                             ,variogram_function=custom_vg\
+                                             ,enable_plotting=_plot_variogram\
+                                             ,enable_statistics=_enable_statistics\
+                                             ,npts=npts\
+                                             ,beta0=beta0\
+                                             ,frac=0.0\
+                                             ,l=l,w=w\
+                                             ,weight=_drive_OKrige_weight\
+                                             ,verbose=_drive_OKrige_verbose\
+                                             ,eps=_drive_OKrige_eps\
+                                             ,backend=_drive_OKrige_backend\
+                         ))
+
+krige_results[-1].dbg_x = longitude1
+krige_results[-1].dbg_y = latitude1
+krige_results[-1].dbg_z = data1
+krige_results[-1].sort_on_longitude_dbg_xyz()
+                     
 end_time = time.time()
 print 'calculation wall clock run time (sec) = '+str(end_time-start_time)
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())

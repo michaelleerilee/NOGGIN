@@ -599,6 +599,7 @@ class MODIS_DataField(object):
                     ,colorbar=False,title=None\
                     ,cmap=None\
                     ,value_map=None\
+                    ,edgecolors=None\
     ):
         # Render the plot in a lambert equal area projection.
         save_m = None
@@ -620,12 +621,14 @@ class MODIS_DataField(object):
                 sc = self.m.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
                                     ,vmin=vmin,vmax=vmax\
                                     ,s=marker_size\
+                                    ,edgecolors=edgecolors\
                 )
             else:
                 sc = self.m.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
                                     ,vmin=vmin,vmax=vmax\
                                     ,s=marker_size\
                                     ,cmap=cmap
+                                    ,edgecolors=edgecolors\
                 )
         else:
             if cmap is None:
@@ -634,6 +637,7 @@ class MODIS_DataField(object):
                                     ,latlon=True\
                                     ,vmin=vmin,vmax=vmax\
                                     ,s=marker_size\
+                                    ,edgecolors=edgecolors\
                 )
             else:
                 sc = self.m.scatter(self.longitude, self.latitude\
@@ -642,6 +646,7 @@ class MODIS_DataField(object):
                                     ,vmin=vmin,vmax=vmax\
                                     ,s=marker_size\
                                     ,cmap=cmap
+                                    ,edgecolors=edgecolors\
                 )
             
         # self.m.pcolormesh(self.longitude, self.latitude, self.data, latlon=True\

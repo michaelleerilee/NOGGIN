@@ -33,6 +33,8 @@ from mpl_toolkits.basemap import Basemap
 
 from scipy.spatial import ConvexHull
 
+import pykrige.variogram_models as vm
+
 import time
 
 start_time = time.time()
@@ -80,64 +82,64 @@ SRC_DIRECTORY_BASE=mdf.data_src_directory()
 SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS-61/'
 SRC_METADATA=SRC_DIRECTORY+'modis_BoundingBoxes.json'
 
-class krigeResults(object):
-    def __init__(self\
-                 ,s=None,z=None,x=None,y=None\
-                 ,hull=None\
-                 ,box=None\
-                 ,vg_parameters=None\
-                 ,note='Default note for krigeResults'):
-        self.clear()
-        if x is not None:
-            self.x=x.copy()
-        if y is not None:
-            self.y=y.copy()
-        if z is not None:
-            self.z=z.copy()
-        if s is not None:
-            self.s=s.copy()
-        if hull is not None:
-            self.hull = hull
-        if box is not None:
-            self.box = box.copy()
-        else:
-            self.box = mdf.BoundingBox()
-        if vg_parameters is not None:
-            self.vg_parameters = vg_parameters
-        self.note = str(note)
-        self.sort_on_longitude()
-        self.construct_hull()
-    def sort_on_longitude(self):
-        """Sort data to avoid bug in basemap. TODO: move into __init__."""
-        if self.x is not None \
-           and self.y is not None \
-           and self.z is not None:
-            idx = self.x.argsort()
-            self.y = self.y[idx[::-1]]
-            self.z = self.z[idx[::-1]]
-            self.x = self.x[idx[::-1]]
-            # self.y = [y for _,y in sorted(zip(self.x,self.y))]
-            # self.z = [z for _,z in sorted(zip(self.x,self.z))]
-            # self.x = sorted(self.x)
-        # else fail silently
-    def clear(self):
-        self.x = None
-        self.y = None
-        self.z = None
-        self.s = None
-        self.hull = None
-        self.box = mdf.BoundingBox()
-        self.note = 'Default note for krigeResults'
-    def construct_hull(self):
-        """Construct the hull from z,x,y. z is used to get the shape of the data, 
-        so it could be replaced using x and y alone."""
-        if self.z is not None \
-           and self.x is not None \
-           and self.y is not None:
-            xy1 = np.zeros((self.z.shape[0],2))
-            xy1[:,0] = self.x
-            xy1[:,1] = self.y
-            self.hull = ConvexHull(xy1)
+## class krigeResults(object):
+##     def __init__(self\
+##                  ,s=None,z=None,x=None,y=None\
+##                  ,hull=None\
+##                  ,box=None\
+##                  ,vg_parameters=None\
+##                  ,note='Default note for krigeResults'):
+##         self.clear()
+##         if x is not None:
+##             self.x=x.copy()
+##         if y is not None:
+##             self.y=y.copy()
+##         if z is not None:
+##             self.z=z.copy()
+##         if s is not None:
+##             self.s=s.copy()
+##         if hull is not None:
+##             self.hull = hull
+##         if box is not None:
+##             self.box = box.copy()
+##         else:
+##             self.box = mdf.BoundingBox()
+##         if vg_parameters is not None:
+##             self.vg_parameters = vg_parameters
+##         self.note = str(note)
+##         self.sort_on_longitude()
+##         self.construct_hull()
+##     def sort_on_longitude(self):
+##         """Sort data to avoid bug in basemap. TODO: move into __init__."""
+##         if self.x is not None \
+##            and self.y is not None \
+##            and self.z is not None:
+##             idx = self.x.argsort()
+##             self.y = self.y[idx[::-1]]
+##             self.z = self.z[idx[::-1]]
+##             self.x = self.x[idx[::-1]]
+##             # self.y = [y for _,y in sorted(zip(self.x,self.y))]
+##             # self.z = [z for _,z in sorted(zip(self.x,self.z))]
+##             # self.x = sorted(self.x)
+##         # else fail silently
+##     def clear(self):
+##         self.x = None
+##         self.y = None
+##         self.z = None
+##         self.s = None
+##         self.hull = None
+##         self.box = mdf.BoundingBox()
+##         self.note = 'Default note for krigeResults'
+##     def construct_hull(self):
+##         """Construct the hull from z,x,y. z is used to get the shape of the data, 
+##         so it could be replaced using x and y alone."""
+##         if self.z is not None \
+##            and self.x is not None \
+##            and self.y is not None:
+##             xy1 = np.zeros((self.z.shape[0],2))
+##             xy1[:,0] = self.x
+##             xy1[:,1] = self.y
+##             self.hull = ConvexHull(xy1)
 
 print 'KrigeSketch start'
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
@@ -150,7 +152,6 @@ for i,v in boxes_json.iteritems():
     lons,lats = mdf.BoundingBox().from_json(v).lons_lats()
     boxes[i] = mdf.box_covering(lons,lats,hack_branchcut_threshold=180.0)
 
-
 # Choose box to krige
 # Memory Error
 # krigeBox = mdf.BoundingBox((mdf.Point((+125.0, 30.0))\
@@ -159,6 +160,7 @@ for i,v in boxes_json.iteritems():
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 
 krigeSketch_results = []
+hires_calc = []
 
 # loading_buffer = 5 # for adding some margin to ensure good coverage
 dLon = 30
@@ -184,7 +186,18 @@ k = -1
 #+    for jLat in range(-90,90,dLat):
 #    for jLat in range(-90,-90+dLat,dLat):
 # ### FULL
+# lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90
+# lores_npts = 2000
+# hires_npts = 16000
+# hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
+# ### FULL
+dLon = 30
+dLat = 30
+dSearch = 0.75*dLon
 lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90
+lores_npts = 2000
+hires_npts = 8000
+hires_calc = [5,11,60,61]
 # ### SMALL CENTER
 # lon0 = -30; lon1 = 30; lat0 = -30; lat1 = 30
 # ### SMALL LEFT CORNER
@@ -192,7 +205,16 @@ lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90
 ### SMALL LEFT CORNER+1
 # lon0 = -180+15; lon1 = -120+15; lat0 = -90+15; lat1 = -30+15
 ### 3x3 LEFT CORNER+1
+# lores_npts = 2000
+# hires_npts = 4000
+# hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
 # lon0 = -180+15; lon1 = -90+15; lat0 = -90+15; lat1 = -0+15
+### A SMALL TEST
+# lon0 = -dLon/2; lon1 = +dLon/2; lat0 = -dLat/2; lat1 = +dLat/2
+# _capture_k = 0
+# lores_npts = 2000
+# hires_npts = 4000
+# hires_calc = []
 
 for iLon in range(lon0,lon1,dLon):
     for jLat in range(lat0,lat1,dLat):
@@ -289,11 +311,7 @@ for iLon in range(lon0,lon1,dLon):
             gridx,gridy = grid.gridxy()
             in_grid = grid.in_grid(longitude1,latitude1)
             ex_grid = grid.ex_grid(longitude1,latitude1)
-    
-            # Target results
-            gridz  = np.zeros(gridx.shape)
-            gridss = np.zeros(gridx.shape)
-    
+        
             # Calculate variogram
     
             nlags=_drive_OKrige_nlags
@@ -357,12 +375,19 @@ for iLon in range(lon0,lon1,dLon):
             #     npts = 2000
 
             # 27d hires_calc = [2,5,11,17,49,54,60,71] 12000/2000
-            hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
+            # hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
+            # if k in hires_calc:
+            #     npts = 16000
+            # else:
+            #     # 27.a-c npts = 4000
+            #     npts = 2000
+
+            # hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
             if k in hires_calc:
-                npts = 16000
+                npts = hires_npts
             else:
-                # 27.a-c npts = 4000
-                npts = 2000
+                npts = lores_npts
+            
                 
             print 'npts( '+str(k)+' ) = '+str(npts)
             
@@ -376,45 +401,90 @@ for iLon in range(lon0,lon1,dLon):
             vmin=1.0; vmax=5.0
             # vmin=np.nanmin(data1); vmax=np.nanmax(data1)
 
-            # The 'custom_args' actually used.
-            variogram_parameters = []
-    
-            gridz, data_x, data_y, data_z\
-                ,variogram_parameters = noggin.drive_OKrige(\
-                                                            grid_stride=dg\
-                                                            ,random_permute=True\
-                                                            ,x=gridx,y=gridy\
-                                                            ,src_x=longitude1\
-                                                            ,src_y=latitude1\
-                                                            ,src_z=data1\
-                                                            ,variogram_model='custom'\
-                                                            ,variogram_parameters=custom_args\
-                                                            ,variogram_function=custom_vg\
-                                                            ,enable_plotting=_plot_variogram\
-                                                            ,enable_statistics=_enable_statistics\
-                                                            ,npts=npts\
-                                                            ,beta0=beta0\
-                                                            ,frac=0.0\
-                                                            ,l=l,w=w\
-                                                            ,weight=_drive_OKrige_weight\
-                                                            ,verbose=_drive_OKrige_verbose\
-                                                            ,eps=_drive_OKrige_eps\
-                                                            ,backend=_drive_OKrige_backend\
-            )
-    
-            # krige_result = krigeResults(x=gridx,y=gridy,z=gridz,box=krigeBox)
-            # krigeSketch_results.append(krige_result)
-            krigeSketch_results.append(krigeResults(x=gridx,y=gridy,z=gridz,box=krigeBox,vg_parameters=variogram_parameters))
-            # xy1 = np.zeros((gridz.shape[0],2))
-            # xy1[:,0] = gridx
-            # xy1[:,1] = gridy
-            # grid_hull = ConvexHull(xy1)
-            print 'k,mnmx(gridz): '+str(k)+', ( '+str(np.nanmin(gridz))+', '+str(np.nanmax(gridz))+' )'
+            krigeSketch_results.append(\
+                                 noggin.drive_OKrige(\
+                                                     grid_stride=dg\
+                                                     ,random_permute=True\
+                                                     ,x=gridx,y=gridy\
+                                                     ,src_x=longitude1\
+                                                     ,src_y=latitude1\
+                                                     ,src_z=data1\
+                                                     ,variogram_model='gamma_rayleigh_nuggetless_variogram_model'\
+                                                     ,variogram_function=vm.variogram_models['gamma_rayleigh_nuggetless_variogram_model'].function\
+                                                     ,enable_plotting=_plot_variogram\
+                                                     ,enable_statistics=_enable_statistics\
+                                                     ,npts=npts\
+                                                     ,beta0=beta0\
+                                                     ,frac=0.0\
+                                                     ,l=l,w=w\
+                                                     ,weight=_drive_OKrige_weight\
+                                                     ,verbose=_drive_OKrige_verbose\
+                                                     ,eps=_drive_OKrige_eps\
+                                                     ,backend=_drive_OKrige_backend\
+                                 ))         
+
+            #krigeSketch_results.append(\
+            #                           noggin.drive_OKrige(\
+            #                                               grid_stride=dg\
+            #                                               ,random_permute=True\
+            #                                               ,x=gridx,y=gridy\
+            #                                               ,src_x=longitude1\
+            #                                               ,src_y=latitude1\
+            #                                               ,src_z=data1\
+            #                                               ,variogram_model='custom'\
+            #                                               ,variogram_parameters=custom_args\
+            #                                               ,variogram_function=custom_vg\
+            #                                               ,enable_plotting=_plot_variogram\
+            #                                               ,enable_statistics=_enable_statistics\
+            #                                               ,npts=npts\
+            #                                               ,beta0=beta0\
+            #                                               ,frac=0.0\
+            #                                               ,l=l,w=w\
+            #                                               ,weight=_drive_OKrige_weight\
+            #                                               ,verbose=_drive_OKrige_verbose\
+            #                                               ,eps=_drive_OKrige_eps\
+            #                                               ,backend=_drive_OKrige_backend\
+            #                           ))
+                                           
+            ## gridz, data_x, data_y, data_z\
+            ##     ,variogram_parameters = noggin.drive_OKrige(\
+            ##                                                 grid_stride=dg\
+            ##                                                 ,random_permute=True\
+            ##                                                 ,x=gridx,y=gridy\
+            ##                                                 ,src_x=longitude1\
+            ##                                                 ,src_y=latitude1\
+            ##                                                 ,src_z=data1\
+            ##                                                 ,variogram_model='custom'\
+            ##                                                 ,variogram_parameters=custom_args\
+            ##                                                 ,variogram_function=custom_vg\
+            ##                                                 ,enable_plotting=_plot_variogram\
+            ##                                                 ,enable_statistics=_enable_statistics\
+            ##                                                 ,npts=npts\
+            ##                                                 ,beta0=beta0\
+            ##                                                 ,frac=0.0\
+            ##                                                 ,l=l,w=w\
+            ##                                                 ,weight=_drive_OKrige_weight\
+            ##                                                 ,verbose=_drive_OKrige_verbose\
+            ##                                                 ,eps=_drive_OKrige_eps\
+            ##                                                 ,backend=_drive_OKrige_backend\
+            ## )
+            ## 
+            ## # krige_result = krigeResults(x=gridx,y=gridy,z=gridz,box=krigeBox)
+            ## # krigeSketch_results.append(krige_result)
+            ## krigeSketch_results.append(krigeResults(x=gridx,y=gridy,z=gridz,box=krigeBox,vg_parameters=variogram_parameters))
+            ## # xy1 = np.zeros((gridz.shape[0],2))
+            ## # xy1[:,0] = gridx
+            ## # xy1[:,1] = gridy
+            ## # grid_hull = ConvexHull(xy1)
+
+            print 'k,mnmx(gridz): '+str(k)\
+                +', ( '+str(np.nanmin(krigeSketch_results[-1].z))\
+                +', '+str(np.nanmax(krigeSketch_results[-1].z))+' )'
     
             if k == _capture_k:
                 print 'capturing k = '+str(k)
-                _capture_z         = np.copy(gridz)
-                _capture_ss        = np.copy(gridss)
+                _capture_z         = np.copy(krigeSketch_results[_capture_k].z)
+                _capture_ss        = np.copy(krigeSketch_results[_capture_k].s)
                 _capture_x         = np.copy(gridx)
                 _capture_y         = np.copy(gridy)
                 _capture_data1     = np.copy(data1)
@@ -423,22 +493,30 @@ for iLon in range(lon0,lon1,dLon):
                 _capture_ex_grid   = np.copy(ex_grid)
                 _capture_in_grid   = np.copy(in_grid)
                 _capture_kr        = krigeSketch_results[_capture_k]
-                _capture_data_x    = np.copy(data_x)
-                _capture_data_y    = np.copy(data_y)
-                _capture_data_z    = np.copy(data_z)
+                _capture_data_x    = np.copy(krigeSketch_results[_capture_k].src_x)
+                _capture_data_y    = np.copy(krigeSketch_results[_capture_k].src_y)
+                _capture_data_z    = np.copy(krigeSketch_results[_capture_k].src_z)
 
             if k >= _capture_k:
                 if np.nanmax(_capture_z) != np.nanmax(krigeSketch_results[_capture_k].z):
                     print 'ERROR at k = '+str(k)
                     print 'ERROR _c_k = '+str(_capture_k)
-                    print 'ERROR _c_z != ksr[_c_k]: '+str(np.nanmax(_capture_z))+' != '+str(np.nanmax(np.nanmax(krigeSketch_results[_capture_k].z)))
+                    print 'ERROR _c_z != ksr[_c_k]: '\
+                        +str(np.nanmax(_capture_z))\
+                        +' != '+str(np.nanmax(np.nanmax(krigeSketch_results[_capture_k].z)))
 
 if _capture_k < len(krigeSketch_results):
-    print '_c_k,mnmx(_capture_z): '+str(_capture_k)+', ( '+str(np.nanmin(_capture_z))+', '+str(np.nanmax(_capture_z))+' )'
+    print '_c_k,mnmx(_capture_z): '\
+        +str(_capture_k)+', ( '+str(np.nanmin(_capture_z))\
+        +', '+str(np.nanmax(_capture_z))+' )'
     if _capture_only:
-        print '_c_k,mnmx(kr[c_k].z): '+str(0)+', ( '+str(np.nanmin(krigeSketch_results[0].z))+', '+str(np.nanmax(krigeSketch_results[0].z))+' )'
+        print '_c_k,mnmx(kr[c_k].z): '\
+            +str(0)+', ( '+str(np.nanmin(krigeSketch_results[0].z))\
+            +', '+str(np.nanmax(krigeSketch_results[0].z))+' )'
     else:
-        print '_c_k,mnmx(kr[c_k].z): '+str(_capture_k)+', ( '+str(np.nanmin(krigeSketch_results[_capture_k].z))+', '+str(np.nanmax(krigeSketch_results[_capture_k].z))+' )'
+        print '_c_k,mnmx(kr[c_k].z): '\
+            +str(_capture_k)+', ( '+str(np.nanmin(krigeSketch_results[_capture_k].z))\
+            +', '+str(np.nanmax(krigeSketch_results[_capture_k].z))+' )'
 
 if True:
     l=0

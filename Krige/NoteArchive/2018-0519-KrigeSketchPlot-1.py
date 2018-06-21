@@ -23,12 +23,16 @@ from mpl_toolkits.basemap import Basemap
 
 from scipy.spatial import ConvexHull
 
+def log_map(x):
+    return np.log10(x+1.0e-9)
+
 _verbose=True
 _debug  =True
 
 _plot_kriged                   = True
-_plot_source_data_outside_grid = False
+# _plot_source_data_outside_grid = False
 _plot_source_data              = False
+_plot_source_data_last_sample  = False
 _plot_kriged_data              = True
 _plot_kriged_outline           = False
 _plot_variogram                = False
@@ -112,8 +116,9 @@ if _plot_kriged:
             # m.scatter(kr.x,kr.y,c=kr.z\
             # m.scatter(kr.x,kr.y,c=np.log10(kr.z+1.0e-9)\
             # m.scatter(kr.x,kr.y,c=kr.z
+            #    m.scatter(kr.x,kr.y,c=np.log10(kr.z+1.0e-9)\
             if _plot_kriged_data:
-                m.scatter(kr.x,kr.y,c=np.log10(kr.z+1.0e-9)\
+                m.scatter(kr.x,kr.y,c=log_map(kr.z)\
                           ,cmap=colormap_x\
                           ,linewidth=0\
                           ,alpha=m_alpha\
@@ -132,12 +137,13 @@ if _plot_kriged:
                 #    xt = xt+360.0
                 # xt, yt = ( np.sum(kr.x)/kr.x.size, np.sum(kr.y)/kr.y.size )
                 plt.text(xt,yt,str(k),color='green')
-            if _plot_source_data:
+            if _plot_source_data and kr.dbg:
                 
+                #                                  data=np.log10(kr.src_z+1.0e-9)\
                 modis_obj_2 = mdf.MODIS_DataField(\
-                                                  data=np.log10(kr.src_z+1.0e-9)\
-                                                  ,latitude=kr.src_y\
-                                                  ,longitude=kr.src_x\
+                                                  data=kr.dbg_z\
+                                                  ,latitude=kr.dbg_y\
+                                                  ,longitude=kr.dbg_x\
                 )
                 modis_obj_2.scatterplot(m=m\
                                         ,title='scatter'\
@@ -145,7 +151,25 @@ if _plot_kriged:
                                         ,vmin=vmin,vmax=vmax\
                                         ,cmap=colormap_x\
                                         ,marker_size=marker_size*10\
+                                        ,value_map=log_map\
                 )
+            if _plot_source_data_last_sample:
+                
+                #                                  data=np.log10(kr.src_z+1.0e-9)\
+                modis_obj_3 = mdf.MODIS_DataField(\
+                                                  data=kr.src_z\
+                                                  ,latitude=kr.src_y\
+                                                  ,longitude=kr.src_x\
+                )
+                modis_obj_3.scatterplot(m=m\
+                                        ,title='scatter'\
+                                        ,plt_show = False\
+                                        ,vmin=vmin,vmax=vmax\
+                                        ,cmap=colormap_x\
+                                        ,marker_size=marker_size*10\
+                                        ,value_map=log_map\
+                )
+                
                 
         # sys.stdout.write(', plotting');
         print '.'

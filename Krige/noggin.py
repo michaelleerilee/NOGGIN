@@ -97,12 +97,16 @@ def center_array(a):
 
 
 class krigeResults(object):
+    """Capture the result of the kriging calculation and provide a place
+to store debugging information as well."""
     def __init__(self\
                  ,s=None\
                  ,z=None,x=None,y=None\
                  ,src_z=None,src_x=None,src_y=None\
+                 ,dbg_z=None,dbg_x=None,dbg_y=None\
                  ,hull=None\
                  ,box=None\
+                 ,vg_function=None\
                  ,vg_parameters=None\
                  ,note='Default note for krigeResults'):
         self.clear()
@@ -120,6 +124,18 @@ class krigeResults(object):
             self.src_y=src_y.copy()
         if src_z is not None:
             self.src_z=src_z.copy()
+        if dbg_x is not None:
+            self.dbg_x=dbg_x.copy()
+        if dbg_y is not None:
+            self.dbg_y=dbg_y.copy()
+        if dbg_z is not None:
+            self.dbg_z=dbg_z.copy()
+        if dbg_x is not None \
+           and dbg_y is not None \
+           and dbg_z is not None:
+            self.dbg = True
+        else:
+            self.dbg = False
         if hull is not None:
             self.hull = hull
         if box is not None:
@@ -128,11 +144,12 @@ class krigeResults(object):
             self.box = None
         if vg_parameters is not None:
             self.vg_parameters = vg_parameters
+        if vg_function is not None:
+            self.vg_function = vg_function
         self.note = str(note)
         self.sort_on_longitude()
         self.construct_hull()
-    def sort_on_longitude(self):
-        """Sort data to avoid bug in basemap. TODO: move into __init__."""
+    def sort_on_longitude_xyz(self):
         if self.x is not None \
            and self.y is not None \
            and self.z is not None:
@@ -140,6 +157,7 @@ class krigeResults(object):
             self.y = self.y[idx[::-1]]
             self.z = self.z[idx[::-1]]
             self.x = self.x[idx[::-1]]
+    def sort_on_longitude_src_xyz(self):
         if self.src_x is not None \
            and self.src_y is not None \
            and self.src_z is not None:
@@ -147,22 +165,34 @@ class krigeResults(object):
             self.src_y = self.src_y[idx[::-1]]
             self.src_z = self.src_z[idx[::-1]]
             self.src_x = self.src_x[idx[::-1]]
-            
-            # self.y = [y for _,y in sorted(zip(self.x,self.y))]
-            # self.z = [z for _,z in sorted(zip(self.x,self.z))]
-            # self.x = sorted(self.x)
+    def sort_on_longitude_dbg_xyz(self):
+        if self.dbg_x is not None \
+           and self.dbg_y is not None \
+           and self.dbg_z is not None:
+            idx = self.dbg_x.argsort()
+            self.dbg_y = self.dbg_y[idx[::-1]]
+            self.dbg_z = self.dbg_z[idx[::-1]]
+            self.dbg_x = self.dbg_x[idx[::-1]]
+    def sort_on_longitude(self):
+        """Sort data to avoid bug in basemap. TODO: move into __init__."""
+        self.sort_on_longitude_xyz()
+        self.sort_on_longitude_src_xyz()
+        self.sort_on_longitude_dbg_xyz()
         # else fail silently
     def clear(self):
-        self.x = None
-        self.y = None
-        self.z = None
-        self.s = None
+        self.x     = None
+        self.y     = None
+        self.z     = None
+        self.s     = None
         self.src_x = None
         self.src_y = None
         self.src_z = None
-        self.hull = None
-        self.box = None
-        self.note = 'Default note for krigeResults'
+        self.dbg_x = None
+        self.dbg_y = None
+        self.dbg_z = None
+        self.hull  = None
+        self.box   = None
+        self.note  = 'Default note for krigeResults'
     def construct_hull(self):
         """Construct the hull from z,x,y. z is used to get the shape of the data, 
         so it could be replaced using x and y alone."""
@@ -179,6 +209,7 @@ class krigeResults(object):
 # https://stackoverflow.com/questions/12251189/how-to-draw-rectangles-on-a-basemap
 
 def draw_screen_poly( lons, lats, m, facecolor='black', edgecolor='black' ):
+    """Draw a polygon based on sequences of lons & lats and a Basemap m. Note len(lons) = len(lats)."""
     x, y = m( lons, lats )
     plt.gca().add_patch( Polygon( zip(x,y)\
                                   ,facecolor=facecolor\
@@ -189,299 +220,204 @@ def draw_screen_poly( lons, lats, m, facecolor='black', edgecolor='black' ):
 
 ###########################################################################
 
-# /Users/mrilee/src/python/PyKrige-1.3.2.tar.gz
-# core.variogram_function_error
-def variogram_function_error(params, x, y, variogram_function, weight):
-    """Function used to in fitting of variogram model.
-    Returns RMSE between calculated fit and actual data."""
-
-    diff = variogram_function(params, x) - y
-
-    if weight:
-        weights = np.arange(x.size, 0.0, -1.0)
-        weights /= np.sum(weights)
-        rmse = np.sqrt(np.average(diff**2, weights=weights))
-    else:
-        rmse = np.sqrt(np.mean(diff**2))
-
-    return rmse
-
-# /Users/mrilee/src/python/PyKrige-1.3.2.tar.gz
-# core.calculate_variogram_model
-
-def calculate_variogram_model(lags, semivariance, variogram_model, variogram_function, weight):
-    """Function that fits a variogram model when parameters are not specified."""
-
-    ## TODO Fix hardcoding
-    # x0 = [2.6,0.2,0.75]
-    x0 = [2.0,0.01,0.0001]
-    
-    ## PyKrige 1.3.2 core._variogram_function_error
-    if True:
-        bnds = ((0.0, 1000), (0.0, 10.0), (0.0, 10.0))
-        res = minimize(variogram_function_error\
-                       ,x0, args=(lags, semivariance, variogram_function, weight),\
-                       method='SLSQP', bounds=bnds)
-    
-    ## PyKrige 1.4 now uses least_squares with a soft L1-norm to minimize outliers...
-    if False:
-        bnds = ([0.0,0.0,0.0], [10,10,10])
-        res = least_squares(core._variogram_residuals, x0, bounds=bnds, loss='soft_l1',\
-                            args=(lags, semivariance, variogram_function, weight))
-
-    return res.x
-
-
-# PyKrige-1.4.0.tar.gz
-# core._initialize_variogram_model
-
-def initialize_variogram_model140(X, y, variogram_model,
-                                  variogram_model_parameters, variogram_function,
-                                  nlags, weight, coordinates_type='geographic'):
-    """Initializes the variogram model for kriging. If user does not specify
-    parameters, calls automatic variogram estimation routine.
-    Returns lags, semivariance, and variogram model parameters.
-
-    Parameters
-    ----------
-    X: ndarray
-        float array [n_samples, n_dim], the input array of coordinates
-    y: ndarray
-        float array [n_samples], the input array of values to be kriged
-    variogram_model: str
-        user-specified variogram model to use
-    variogram_model_parameters: list
-        user-specified parameters for variogram model
-    variogram_function: callable
-        function that will be called to evaluate variogram model
-        (only used if user does not specify variogram model parameters)
-    nlags: int
-        integer scalar, number of bins into which to group inter-point distances
-    weight: bool
-        boolean flag that indicates whether the semivariances at smaller lags
-        should be weighted more heavily in the automatic variogram estimation
-    coordinates_type: str
-        type of coordinates in X array, can be 'euclidean' for standard
-        rectangular coordinates or 'geographic' if the coordinates are lat/lon
-
-    Returns
-    -------
-    lags: ndarray
-        float array [nlags], distance values for bins into which the
-        semivariances were grouped
-    semivariance: ndarray
-        float array [nlags], averaged semivariance for each bin
-    variogram_model_parameters: list
-        parameters for the variogram model, either returned unaffected if the
-        user specified them or returned from the automatic variogram
-        estimation routine
-    """
-
-    # distance calculation for rectangular coords now leverages
-    # scipy.spatial.distance's pdist function, which gives pairwise distances
-    # in a condensed distance vector (distance matrix flattened to a vector)
-    # to calculate semivariances...
-    if coordinates_type == 'euclidean':
-        d = pdist(X, metric='euclidean')
-        g = 0.5 * pdist(y[:, None], metric='sqeuclidean')
-
-    # geographic coordinates only accepted if the problem is 2D
-    # assume X[:, 0] ('x') => lon, X[:, 1] ('y') => lat
-    # old method of distance calculation is retained here...
-    # could be improved in the future
-    elif coordinates_type == 'geographic':
-        if X.shape[1] != 2:
-            raise ValueError('Geographic coordinate type only '
-                             'supported for 2D datasets.')
-        x1, x2 = np.meshgrid(X[:, 0], X[:, 0], sparse=True)
-        y1, y2 = np.meshgrid(X[:, 1], X[:, 1], sparse=True)
-        z1, z2 = np.meshgrid(y, y, sparse=True)
-        d = core.great_circle_distance(x1, y1, x2, y2)
-        g = 0.5 * (z1 - z2)**2.
-        indices = np.indices(d.shape)
-        d = d[(indices[0, :, :] > indices[1, :, :])]
-        g = g[(indices[0, :, :] > indices[1, :, :])]
-
-    else:
-        raise ValueError("Specified coordinate type '%s' "
-                         "is not supported." % coordinates_type)
-
-    # Equal-sized bins are now implemented. The upper limit on the bins
-    # is appended to the list (instead of calculated as part of the
-    # list comprehension) to avoid any numerical oddities
-    # (specifically, say, ending up as 0.99999999999999 instead of 1.0).
-    # Appending dmax + 0.001 ensures that the largest distance value
-    # is included in the semivariogram calculation.
-    dmax = np.amax(d)
-    dmin = np.amin(d)
-    dd = (dmax - dmin) / nlags
-    bins = [dmin + n * dd for n in range(nlags)]
-    dmax += 0.001
-    bins.append(dmax)
-
-    # This old binning method was experimental and doesn't seem
-    # to work too well. Bins were computed such that there are more
-    # at shorter lags. This effectively weights smaller distances more
-    # highly in determining the variogram. As Kitanidis points out,
-    # the variogram fit to the data at smaller lag distances is more
-    # important. However, the value at the largest lag probably ends up
-    # being biased too high for the larger values and thereby throws off
-    # automatic variogram calculation and confuses comparison of the
-    # semivariogram with the variogram model.
-    #
-    # dmax = np.amax(d)
-    # dmin = np.amin(d)
-    # dd = dmax - dmin
-    # bins = [dd*(0.5**n) + dmin for n in range(nlags, 1, -1)]
-    # bins.insert(0, dmin)
-    # bins.append(dmax)
-
-    lags = np.zeros(nlags)
-    semivariance = np.zeros(nlags)
-
-    for n in range(nlags):
-        # This 'if... else...' statement ensures that there are data
-        # in the bin so that numpy can actually find the mean. If we
-        # don't test this first, then Python kicks out an annoying warning
-        # message when there is an empty bin and we try to calculate the mean.
-        if d[(d >= bins[n]) & (d < bins[n + 1])].size > 0:
-            lags[n] = np.mean(d[(d >= bins[n]) & (d < bins[n + 1])])
-            semivariance[n] = np.mean(g[(d >= bins[n]) & (d < bins[n + 1])])
-        else:
-            lags[n] = np.nan
-            semivariance[n] = np.nan
-
-    lags = lags[~np.isnan(semivariance)]
-    semivariance = semivariance[~np.isnan(semivariance)]
-
-    # We only use our custom model, and then calculate the parameters.
-    
-    # # a few tests the make sure that, if the variogram_model_parameters
-    # # are supplied, they have been supplied as expected...
-    # # if variogram_model_parameters was not defined, then estimate the variogram
-    # if variogram_model_parameters is not None:
-    #     if variogram_model == 'linear' and len(variogram_model_parameters) != 2:
-    #         raise ValueError("Exactly two parameters required "
-    #                          "for linear variogram model.")
-    #     elif variogram_model in ['power', 'spherical', 'exponential',
-    #                              'gaussian', 'hole-effect'] \
-    #             and len(variogram_model_parameters) != 3:
-    #         raise ValueError("Exactly three parameters required for "
-    #                          "%s variogram model" % variogram_model)
-    # else:
-    #     if variogram_model == 'custom':
-    #         raise ValueError("Variogram parameters must be specified when "
-    #                          "implementing custom variogram model.")
-    #     else:
-    #         variogram_model_parameters = \
-    #             _calculate_variogram_model(lags, semivariance, variogram_model,
-    #                                        variogram_function, weight)
-
-    # TODO HACK -- Refactor and do better... 
-    variogram_model_parameters = \
-                                 calculate_variogram_model(lags, semivariance, variogram_model,
-                                                           variogram_function, weight)
-
-    return lags, semivariance, variogram_model_parameters
-
-
-
-# /Users/mrilee/src/python/PyKrige-1.3.2.tar.gz
-# core.initialize_variogram_model
-
-def initialize_variogram_model132(x, y, z, variogram_model, variogram_model_parameters,
-                               variogram_function, nlags, weight
-):
-    """Initializes the variogram model for kriging according
-    to user specifications or to defaults.
-
-    Taken from PyKrige 1.3+ and 1.4. Would like to elide...
-"""
-
-    print('initialize_variogram_model')
-
-    x1, x2 = np.meshgrid(x, x)
-    y1, y2 = np.meshgrid(y, y)
-    z1, z2 = np.meshgrid(z, z)
-
-    dx = x1 - x2
-    dy = y1 - y2
-    dz = z1 - z2
-    d = np.sqrt(dx**2 + dy**2)
-    g = 0.5 * dz**2
-
-    indices = np.indices(d.shape)
-    d = d[(indices[0, :, :] > indices[1, :, :])]
-    g = g[(indices[0, :, :] > indices[1, :, :])]
-
-    # Equal-sized bins are now implemented. The upper limit on the bins
-    # is appended to the list (instead of calculated as part of the
-    # list comprehension) to avoid any numerical oddities
-    # (specifically, say, ending up as 0.99999999999999 instead of 1.0).
-    # Appending dmax + 0.001 ensures that the largest distance value
-    # is included in the semivariogram calculation.
-    dmax = np.amax(d)
-    dmin = np.amin(d)
-    dd = (dmax - dmin)/nlags
-    bins = [dmin + n*dd for n in range(nlags)]
-    dmax += 0.001
-    bins.append(dmax)
-
-    # This old binning method was experimental and doesn't seem
-    # to work too well. Bins were computed such that there are more
-    # at shorter lags. This effectively weights smaller distances more
-    # highly in determining the variogram. As Kitanidis points out,
-    # the variogram fit to the data at smaller lag distances is more
-    # important. However, the value at the largest lag probably ends up
-    # being biased too high for the larger values and thereby throws off
-    # automatic variogram calculation and confuses comparison of the
-    # semivariogram with the variogram model.
-    #
-    # dmax = np.amax(d)
-    # dmin = np.amin(d)
-    # dd = dmax - dmin
-    # bins = [dd*(0.5**n) + dmin for n in range(nlags, 1, -1)]
-    # bins.insert(0, dmin)
-    # bins.append(dmax)
-
-    lags = np.zeros(nlags)
-    semivariance = np.zeros(nlags)
-
-    for n in range(nlags):
-        # This 'if... else...' statement ensures that there are data
-        # in the bin so that numpy can actually find the mean. If we
-        # don't test this first, then Python kicks out an annoying warning
-        # message when there is an empty bin and we try to calculate the mean.
-        if d[(d >= bins[n]) & (d < bins[n + 1])].size > 0:
-            lags[n] = np.mean(d[(d >= bins[n]) & (d < bins[n + 1])])
-            semivariance[n] = np.mean(g[(d >= bins[n]) & (d < bins[n + 1])])
-        else:
-            lags[n] = np.nan
-            semivariance[n] = np.nan
-
-    lags = lags[~np.isnan(semivariance)]
-    semivariance = semivariance[~np.isnan(semivariance)]
-
-    #if variogram_model_parameters is not None:
-    #    if variogram_model == 'linear' and len(variogram_model_parameters) != 2:
-    #        raise ValueError("Exactly two parameters required "
-    #                         "for linear variogram model")
-    #    elif (variogram_model == 'power' or variogram_model == 'spherical' or variogram_model == 'exponential'
-    #          or variogram_model == 'gaussian') and len(variogram_model_parameters) != 3:
-    #        raise ValueError("Exactly three parameters required "
-    #                         "for %s variogram model" % variogram_model)
-    #else:
-    #    if variogram_model == 'custom':
-    #        raise ValueError("Variogram parameters must be specified when implementing custom variogram model.")
-    #    else:
-    #        variogram_model_parameters = calculate_variogram_model(lags, semivariance, variogram_model,
-    #                                                               variogram_function, weight)
-
-    variogram_model_parameters = calculate_variogram_model(lags, semivariance, variogram_model,
-                                                                    variogram_function, weight)
-
-    return lags, semivariance, variogram_model_parameters
-
+#### mlr #### # /Users/mrilee/src/python/PyKrige-1.3.2.tar.gz
+#### mlr #### # core.variogram_function_error
+#### mlr #### def variogram_function_error(params, x, y, variogram_function, weight):
+#### mlr ####     """Function used to in fitting of variogram model.
+#### mlr ####     Returns RMSE between calculated fit and actual data."""
+#### mlr #### 
+#### mlr ####     diff = variogram_function(params, x) - y
+#### mlr #### 
+#### mlr ####     if weight:
+#### mlr ####         weights = np.arange(x.size, 0.0, -1.0)
+#### mlr ####         weights /= np.sum(weights)
+#### mlr ####         rmse = np.sqrt(np.average(diff**2, weights=weights))
+#### mlr ####     else:
+#### mlr ####         rmse = np.sqrt(np.mean(diff**2))
+#### mlr #### 
+#### mlr ####     return rmse
+#### mlr #### 
+#### mlr #### # /Users/mrilee/src/python/PyKrige-1.3.2.tar.gz
+#### mlr #### # core.calculate_variogram_model
+#### mlr #### 
+#### mlr #### def calculate_variogram_model(lags, semivariance, variogram_model, variogram_function, weight):
+#### mlr ####     """Function that fits a variogram model when parameters are not specified."""
+#### mlr #### 
+#### mlr ####     ## TODO Fix hardcoding
+#### mlr ####     # x0 = [2.6,0.2,0.75]
+#### mlr ####     x0 = [2.0,0.01,0.0001]
+#### mlr ####     
+#### mlr ####     ## PyKrige 1.3.2 core._variogram_function_error
+#### mlr ####     if False:
+#### mlr ####         bnds = ((0.0, 1000), (0.0, 10.0), (0.0, 10.0))
+#### mlr ####         res = minimize(variogram_function_error\
+#### mlr ####                        ,x0, args=(lags, semivariance, variogram_function, weight),\
+#### mlr ####                        method='SLSQP', bounds=bnds)
+#### mlr ####     
+#### mlr ####     ## PyKrige 1.4 now uses least_squares with a soft L1-norm to minimize outliers...
+#### mlr ####     if True:
+#### mlr ####         bnds = ([0.0,0.0,0.0], [1000,10,10])
+#### mlr ####         res = least_squares(core._variogram_residuals, x0, bounds=bnds, loss='soft_l1',\
+#### mlr ####                             args=(lags, semivariance, variogram_function, weight))
+#### mlr #### 
+#### mlr ####     return res.x
+#### mlr #### 
+#### mlr #### 
+#### mlr #### # PyKrige-1.4.0.tar.gz
+#### mlr #### # core._initialize_variogram_model
+#### mlr #### 
+#### mlr #### def initialize_variogram_model140(X, y, variogram_model,
+#### mlr ####                                   variogram_model_parameters, variogram_function,
+#### mlr ####                                   nlags, weight, coordinates_type='geographic'):
+#### mlr ####     """Initializes the variogram model for kriging. If user does not specify
+#### mlr ####     parameters, calls automatic variogram estimation routine.
+#### mlr ####     Returns lags, semivariance, and variogram model parameters.
+#### mlr #### 
+#### mlr ####     Parameters
+#### mlr ####     ----------
+#### mlr ####     X: ndarray
+#### mlr ####         float array [n_samples, n_dim], the input array of coordinates
+#### mlr ####     y: ndarray
+#### mlr ####         float array [n_samples], the input array of values to be kriged
+#### mlr ####     variogram_model: str
+#### mlr ####         user-specified variogram model to use
+#### mlr ####     variogram_model_parameters: list
+#### mlr ####         user-specified parameters for variogram model
+#### mlr ####     variogram_function: callable
+#### mlr ####         function that will be called to evaluate variogram model
+#### mlr ####         (only used if user does not specify variogram model parameters)
+#### mlr ####     nlags: int
+#### mlr ####         integer scalar, number of bins into which to group inter-point distances
+#### mlr ####     weight: bool
+#### mlr ####         boolean flag that indicates whether the semivariances at smaller lags
+#### mlr ####         should be weighted more heavily in the automatic variogram estimation
+#### mlr ####     coordinates_type: str
+#### mlr ####         type of coordinates in X array, can be 'euclidean' for standard
+#### mlr ####         rectangular coordinates or 'geographic' if the coordinates are lat/lon
+#### mlr #### 
+#### mlr ####     Returns
+#### mlr ####     -------
+#### mlr ####     lags: ndarray
+#### mlr ####         float array [nlags], distance values for bins into which the
+#### mlr ####         semivariances were grouped
+#### mlr ####     semivariance: ndarray
+#### mlr ####         float array [nlags], averaged semivariance for each bin
+#### mlr ####     variogram_model_parameters: list
+#### mlr ####         parameters for the variogram model, either returned unaffected if the
+#### mlr ####         user specified them or returned from the automatic variogram
+#### mlr ####         estimation routine
+#### mlr ####     """
+#### mlr #### 
+#### mlr ####     # distance calculation for rectangular coords now leverages
+#### mlr ####     # scipy.spatial.distance's pdist function, which gives pairwise distances
+#### mlr ####     # in a condensed distance vector (distance matrix flattened to a vector)
+#### mlr ####     # to calculate semivariances...
+#### mlr ####     if coordinates_type == 'euclidean':
+#### mlr ####         d = pdist(X, metric='euclidean')
+#### mlr ####         g = 0.5 * pdist(y[:, None], metric='sqeuclidean')
+#### mlr #### 
+#### mlr ####     # geographic coordinates only accepted if the problem is 2D
+#### mlr ####     # assume X[:, 0] ('x') => lon, X[:, 1] ('y') => lat
+#### mlr ####     # old method of distance calculation is retained here...
+#### mlr ####     # could be improved in the future
+#### mlr ####     elif coordinates_type == 'geographic':
+#### mlr ####         if X.shape[1] != 2:
+#### mlr ####             raise ValueError('Geographic coordinate type only '
+#### mlr ####                              'supported for 2D datasets.')
+#### mlr ####         x1, x2 = np.meshgrid(X[:, 0], X[:, 0], sparse=True)
+#### mlr ####         y1, y2 = np.meshgrid(X[:, 1], X[:, 1], sparse=True)
+#### mlr ####         z1, z2 = np.meshgrid(y, y, sparse=True)
+#### mlr ####         d = core.great_circle_distance(x1, y1, x2, y2)
+#### mlr ####         g = 0.5 * (z1 - z2)**2.
+#### mlr ####         indices = np.indices(d.shape)
+#### mlr ####         d = d[(indices[0, :, :] > indices[1, :, :])]
+#### mlr ####         g = g[(indices[0, :, :] > indices[1, :, :])]
+#### mlr #### 
+#### mlr ####     else:
+#### mlr ####         raise ValueError("Specified coordinate type '%s' "
+#### mlr ####                          "is not supported." % coordinates_type)
+#### mlr #### 
+#### mlr ####     # Equal-sized bins are now implemented. The upper limit on the bins
+#### mlr ####     # is appended to the list (instead of calculated as part of the
+#### mlr ####     # list comprehension) to avoid any numerical oddities
+#### mlr ####     # (specifically, say, ending up as 0.99999999999999 instead of 1.0).
+#### mlr ####     # Appending dmax + 0.001 ensures that the largest distance value
+#### mlr ####     # is included in the semivariogram calculation.
+#### mlr ####     dmax = np.amax(d)
+#### mlr ####     dmin = np.amin(d)
+#### mlr ####     dd = (dmax - dmin) / nlags
+#### mlr ####     bins = [dmin + n * dd for n in range(nlags)]
+#### mlr ####     dmax += 0.001
+#### mlr ####     bins.append(dmax)
+#### mlr #### 
+#### mlr ####     # This old binning method was experimental and doesn't seem
+#### mlr ####     # to work too well. Bins were computed such that there are more
+#### mlr ####     # at shorter lags. This effectively weights smaller distances more
+#### mlr ####     # highly in determining the variogram. As Kitanidis points out,
+#### mlr ####     # the variogram fit to the data at smaller lag distances is more
+#### mlr ####     # important. However, the value at the largest lag probably ends up
+#### mlr ####     # being biased too high for the larger values and thereby throws off
+#### mlr ####     # automatic variogram calculation and confuses comparison of the
+#### mlr ####     # semivariogram with the variogram model.
+#### mlr ####     #
+#### mlr ####     # dmax = np.amax(d)
+#### mlr ####     # dmin = np.amin(d)
+#### mlr ####     # dd = dmax - dmin
+#### mlr ####     # bins = [dd*(0.5**n) + dmin for n in range(nlags, 1, -1)]
+#### mlr ####     # bins.insert(0, dmin)
+#### mlr ####     # bins.append(dmax)
+#### mlr #### 
+#### mlr ####     lags = np.zeros(nlags)
+#### mlr ####     semivariance = np.zeros(nlags)
+#### mlr #### 
+#### mlr ####     for n in range(nlags):
+#### mlr ####         # This 'if... else...' statement ensures that there are data
+#### mlr ####         # in the bin so that numpy can actually find the mean. If we
+#### mlr ####         # don't test this first, then Python kicks out an annoying warning
+#### mlr ####         # message when there is an empty bin and we try to calculate the mean.
+#### mlr ####         if d[(d >= bins[n]) & (d < bins[n + 1])].size > 0:
+#### mlr ####             lags[n] = np.mean(d[(d >= bins[n]) & (d < bins[n + 1])])
+#### mlr ####             semivariance[n] = np.mean(g[(d >= bins[n]) & (d < bins[n + 1])])
+#### mlr ####         else:
+#### mlr ####             lags[n] = np.nan
+#### mlr ####             semivariance[n] = np.nan
+#### mlr #### 
+#### mlr ####     lags = lags[~np.isnan(semivariance)]
+#### mlr ####     semivariance = semivariance[~np.isnan(semivariance)]
+#### mlr #### 
+#### mlr ####     # We only use our custom model, and then calculate the parameters.
+#### mlr ####     
+#### mlr ####     # a few tests the make sure that, if the variogram_model_parameters
+#### mlr ####     # are supplied, they have been supplied as expected...
+#### mlr ####     # if variogram_model_parameters was not defined, then estimate the variogram
+#### mlr ####     if variogram_model_parameters is not None:
+#### mlr ####         if variogram_model == 'linear' and len(variogram_model_parameters) != 2:
+#### mlr ####             raise ValueError("Exactly two parameters required "
+#### mlr ####                              "for linear variogram model.")
+#### mlr ####         elif variogram_model in ['power', 'spherical', 'exponential',
+#### mlr ####                                  'gaussian', 'hole-effect'] \
+#### mlr ####                 and len(variogram_model_parameters) != 3:
+#### mlr ####             raise ValueError("Exactly three parameters required for "
+#### mlr ####                              "%s variogram model" % variogram_model)
+#### mlr ####         # Nothing to do! elif variogram_model == 'custom':
+#### mlr ####     else:
+#### mlr ####         # if variogram_model == 'custom':
+#### mlr ####         #     raise ValueError("Variogram parameters must be specified when "
+#### mlr ####         #                      "implementing custom variogram model.")
+#### mlr ####         # else:
+#### mlr ####         variogram_model_parameters = \
+#### mlr ####             calculate_variogram_model(lags, semivariance, variogram_model,
+#### mlr ####                                        variogram_function, weight)
+#### mlr #### 
+#### mlr ####     # # TODO HACK -- Refactor and do better... 
+#### mlr ####     # variogram_model_parameters = \
+#### mlr ####     #                              calculate_variogram_model(lags, semivariance, variogram_model,
+#### mlr ####     #                                                        variogram_function, weight)
+#### mlr #### 
+#### mlr ####     # 2018-0620-1252-45-EDT MLR The following does not work.
+#### mlr ####     #                             core._calculate_variogram_model(lags, semivariance, variogram_model,
+#### mlr #### 
+#### mlr ####     return lags, semivariance, variogram_model_parameters
 
 def fit_variogram(x,y,z
                   ,variogram_model
@@ -537,16 +473,27 @@ def fit_variogram(x,y,z
     #     )
 
 
-    # Note: also consider np.vstack((x,y)).T
+    # # Note: also consider np.vstack((x,y)).T
+    # self_lags, self_semivariance, self_variogram_model_parameters = \
+    #     initialize_variogram_model140(\
+    #                                   np.column_stack((self_X_ORIG,self_Y_ORIG))\
+    #                                   ,self_Z\
+    #                                   ,self_variogram_model, variogram_parameters\
+    #                                   ,self_variogram_function, nlags, weight\
+    #                                   ,coordinates_type=coordinates_type\
+    #     )
+
+    # core._
+    
     self_lags, self_semivariance, self_variogram_model_parameters = \
-        initialize_variogram_model140(\
+        core._initialize_variogram_model(\
                                       np.column_stack((self_X_ORIG,self_Y_ORIG))\
                                       ,self_Z\
                                       ,self_variogram_model, variogram_parameters\
                                       ,self_variogram_function, nlags, weight\
                                       ,coordinates_type=coordinates_type\
         )
-
+    
 # This only used for euclidean...
 #                                          np.column_stack((self_X_ADJUSTED, self_Y_ADJUSTED))\
 
@@ -580,11 +527,17 @@ def drive_OKrige(
         ,eps=1.0e-10
         ,backend='vectorized'
         ):
-    """ """
+    """Krige from src_ arguments to x,y returning the kriged result gridz, gridss
+and the data_ and the variogram_parameters of the last sub-calculation.
+
+"""
     if variogram_parameters is None:
         calculate_parms = True
     else:
         calculate_parms = False
+
+    variogram_parameters_used = []
+    
     gridz  = np.zeros(x.shape)
     gridss = np.zeros(x.shape)
     if random_permute:
@@ -631,7 +584,7 @@ def drive_OKrige(
                 )
             print('parms: ',parms)
             variogram_parameters = list(parms)
-        
+
 	    # OK = OrdinaryKriging( data_x1, data_y, data_z, variogram_model='exponential',
 	    # OK = OrdinaryKriging( data_x1, data_y, data_z, nlags=nlags\
 	    #                           ,variogram_model='exponential'\
@@ -680,8 +633,17 @@ def drive_OKrige(
 	    # gridss[i:i+grid_stride] = ss[:]
 	    gridz [isample] = np.exp(z[:])
 	    gridss[isample] = ss[:]
-    
-    return gridz, data_x, data_y, data_z, variogram_parameters
+    # TODO Need to return gridss
+    return krigeResults(s              = gridss\
+                        ,z             = gridz\
+                        ,x             = x\
+                        ,y             = y\
+                        ,src_z         = data_z\
+                        ,src_x         = data_x\
+                        ,src_y         = data_y\
+                        ,vg_function   = variogram_function\
+                        ,vg_parameters = variogram_parameters)
+    # return gridz, data_x, data_y, data_z, variogram_parameters
     
 ####
 
@@ -783,6 +745,7 @@ class fig_generator():
 ###########################################################################
 
 class bounding_box_latlon():
+    """Provide a way to determine if latlon bounding boxes overlap."""
     def __init__(self,lat_min,lat_max,lon_min,lon_max,lat_center=None,lon_center=None\
                      ,label=None):
         self.lat_min = lat_min
@@ -831,6 +794,7 @@ class Test_bounding_box(unittest.TestCase):
 ###########################################################################
 
 def data_src_directory():
+    """Determine the directory containing the data to be processed."""
     if('NOGGIN_DATA_SRC_DIRECTORY' in os.environ):
         SRC_DIRECTORY_BASE=os.environ['NOGGIN_DATA_SRC_DIRECTORY']
     else:
