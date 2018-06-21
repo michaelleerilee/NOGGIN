@@ -530,6 +530,8 @@ def drive_OKrige(
     """Krige from src_ arguments to x,y returning the kriged result gridz, gridss
 and the data_ and the variogram_parameters of the last sub-calculation.
 
+'Geographic' (lon-lat) coordinate type is assumed.
+
 """
     if variogram_parameters is None:
         calculate_parms = True

@@ -190,14 +190,30 @@ k = -1
 # lores_npts = 2000
 # hires_npts = 16000
 # hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
-# ### FULL
+# ### FULL Baseline 2018-0607 and 0621
 dLon = 30
 dLat = 30
 dSearch = 0.75*dLon
 lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90
 lores_npts = 2000
 hires_npts = 8000
-hires_calc = [5,11,60,61]
+# hires_calc = [5,11,37,48,60,61,63,67,68]
+hires_calc = []
+divergence_threshold = 1.5
+npts_increase_factor = 1.5
+
+# ### FULL Bands
+dLon = 90
+dLat = 10
+dSearch = 0.75*dLon
+lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90
+lores_npts = 2000
+hires_npts = 8000
+# hires_calc = [5,11,37,48,60,61,63,67,68]
+hires_calc = []
+divergence_threshold = 1.5
+npts_increase_factor = 1.5
+
 # ### SMALL CENTER
 # lon0 = -30; lon1 = 30; lat0 = -30; lat1 = 30
 # ### SMALL LEFT CORNER
@@ -277,7 +293,7 @@ for iLon in range(lon0,lon1,dLon):
             data      = np.zeros(total_size_modis_objs)
             latitude  = np.zeros(total_size_modis_objs)
             longitude = np.zeros(total_size_modis_objs)
-    
+ 
             i0=0
             for i in range(len(sizes_modis_objs)):
                 i1 = i0 + sizes_modis_objs[i]
@@ -291,6 +307,7 @@ for iLon in range(lon0,lon1,dLon):
             data1      = data[idx]
             latitude1  = latitude[idx]
             longitude1 = longitude[idx]
+
         
             # modis_obj_1 = MODIS_DataField(data=data1,latitude=latitude1,longitude=longitude1)
             # modis_obj_1.scatterplot(vmin=1.0,vmax=4.0,title='scatter')
@@ -311,6 +328,8 @@ for iLon in range(lon0,lon1,dLon):
             gridx,gridy = grid.gridxy()
             in_grid = grid.in_grid(longitude1,latitude1)
             ex_grid = grid.ex_grid(longitude1,latitude1)
+
+            data_mx_in_grid = np.nanmax(data1[in_grid])
         
             # Calculate variogram
     
@@ -401,27 +420,43 @@ for iLon in range(lon0,lon1,dLon):
             vmin=1.0; vmax=5.0
             # vmin=np.nanmin(data1); vmax=np.nanmax(data1)
 
-            krigeSketch_results.append(\
-                                 noggin.drive_OKrige(\
-                                                     grid_stride=dg\
-                                                     ,random_permute=True\
-                                                     ,x=gridx,y=gridy\
-                                                     ,src_x=longitude1\
-                                                     ,src_y=latitude1\
-                                                     ,src_z=data1\
-                                                     ,variogram_model='gamma_rayleigh_nuggetless_variogram_model'\
-                                                     ,variogram_function=vm.variogram_models['gamma_rayleigh_nuggetless_variogram_model'].function\
-                                                     ,enable_plotting=_plot_variogram\
-                                                     ,enable_statistics=_enable_statistics\
-                                                     ,npts=npts\
-                                                     ,beta0=beta0\
-                                                     ,frac=0.0\
-                                                     ,l=l,w=w\
-                                                     ,weight=_drive_OKrige_weight\
-                                                     ,verbose=_drive_OKrige_verbose\
-                                                     ,eps=_drive_OKrige_eps\
-                                                     ,backend=_drive_OKrige_backend\
-                                 ))         
+            max_iter = 5
+            npts_in = npts
+            while( True ):
+                print 'npts_in( '+str(k)+' ) = '+str(npts_in)
+                kr=noggin.drive_OKrige(\
+                                       grid_stride=dg\
+                                       ,random_permute=True\
+                                       ,x=gridx,y=gridy\
+                                       ,src_x=longitude1\
+                                       ,src_y=latitude1\
+                                       ,src_z=data1\
+                                       ,variogram_model='gamma_rayleigh_nuggetless_variogram_model'\
+                                       ,variogram_function=vm.variogram_models['gamma_rayleigh_nuggetless_variogram_model'].function\
+                                       ,enable_plotting=_plot_variogram\
+                                       ,enable_statistics=_enable_statistics\
+                                       ,npts=npts_in\
+                                       ,beta0=beta0\
+                                       ,frac=0.0\
+                                       ,l=l,w=w\
+                                       ,weight=_drive_OKrige_weight\
+                                       ,verbose=_drive_OKrige_verbose\
+                                       ,eps=_drive_OKrige_eps\
+                                       ,backend=_drive_OKrige_backend\
+                )
+                kr_mx = np.nanmax(kr.z)
+                max_iter = max_iter - 1
+                print 'kr_mx,data_mx_in_grid: ',kr_mx,data_mx_in_grid
+                if (max_iter < 1) or (kr_mx < divergence_threshold * data_mx_in_grid):
+                    if (max_iter < 1):
+                        print 'kriging diverged, max_iter exceeded, continuing to next tile'
+                    break
+                else:
+                    print 'kriging diverged, increasing npts'
+                    print 'iter: ',4-max_iter
+                    npts_in = npts_in*npts_increase_factor
+                                 
+            krigeSketch_results.append(kr)
 
             #krigeSketch_results.append(\
             #                           noggin.drive_OKrige(\

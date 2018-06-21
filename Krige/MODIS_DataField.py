@@ -371,7 +371,13 @@ class MODIS_DataField(object):
                  ,data=None,latitude=None,longitude=None\
                  ,colormesh_title='colormesh_title'\
                  ,long_name='long_name'\
-                 ,hack_branchcut_threshold=0):
+                 ,hack_branchcut_threshold=0\
+                 ,custom_loader=None\
+    ):
+        """
+
+custom_loader=None. A callable(self) that allows a user to write a custom loader using a visitor pattern (https://en.wikipedia.org/wiki/Visitor_pattern). The methods load05 and load08 can be used as patterns for writing the callable.
+"""
         self.datafilename             = datafilename
         self.datafieldname            = datafieldname
         self.data                     = data
@@ -380,6 +386,7 @@ class MODIS_DataField(object):
         self.srcdirname               = srcdirname
         self.geofile                  = geofile
         self.hack_branchcut_threshold = hack_branchcut_threshold
+        self.custom_loader            = custom_loader
         # Should test that either datafilename or data is set.
         if self.datafilename is not None:
             self.load()
@@ -388,6 +395,10 @@ class MODIS_DataField(object):
             self.plot_lon_m_center = np.nanmean(self.longitude)
 
     def load(self):
+        # TODO MLR Verify this use of callable works.
+        if callable(self.custom_loader):
+            custom_loader(self)
+            return
         if self.datafilename[0:3] in ["MOD","MYD"]:
             if self.datafilename[3:5] == '05':
                 self.load05()
@@ -680,6 +691,8 @@ class MODIS_DataField(object):
         return \
           np.ravel(self.data),np.ravel(self.latitude),np.ravel(self.longitude)
 
+    def data_mnmx(self):
+        return (np.nanmin(self.data),np.nanmax(self.data))
 
 
 class TestPoint(unittest.TestCase):
