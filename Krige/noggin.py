@@ -633,6 +633,8 @@ and the data_ and the variogram_parameters of the last sub-calculation.
             #                   ,backend='C'\
 	    # gridz[i:i+grid_stride]  = np.exp(z[:])
 	    # gridss[i:i+grid_stride] = ss[:]
+            if verbose:
+                print('driveOKrige isample,mnmx(ln(z)): ',isample,np.nanmin(z),np.nanmax(z))
 	    gridz [isample] = np.exp(z[:])
 	    gridss[isample] = ss[:]
     # TODO Need to return gridss

@@ -31,7 +31,7 @@ _debug  =True
 
 _plot_kriged                   = True
 # _plot_source_data_outside_grid = False
-_plot_source_data              = False
+_plot_source_data              = True
 _plot_source_data_last_sample  = False
 _plot_kriged_data              = True
 _plot_kriged_outline           = False

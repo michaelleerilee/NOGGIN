@@ -50,6 +50,8 @@ _drive_OKrige_enable_statistics = False
 _drive_OKrige_eps = 1.0e-10
 # 'vectorized' 'loop' 'C'
 _drive_OKrige_backend = 'vectorized'
+#bad _drive_OKrige_variogram = 'gamma_rayleigh_variogram_model'
+_drive_OKrige_variogram = 'gamma_rayleigh_nuggetless_variogram_model'
 
 _plot_source_data_outside_grid = False
 _plot_kriged                   = True
@@ -159,6 +161,7 @@ for i,v in boxes_json.iteritems():
 #
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 
+targetBoxes=[]
 krigeSketch_results = []
 hires_calc = []
 
@@ -190,29 +193,73 @@ k = -1
 # lores_npts = 2000
 # hires_npts = 16000
 # hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
-# ### FULL Baseline 2018-0607 and 0621
-dLon = 30
-dLat = 30
+# # ### FULL Baseline 2018-0607 and 0621
+# dLon = 30
+# dLat = 30
+# dSearch = 0.75*dLon
+# lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90
+# lores_npts = 2000
+# hires_npts = 8000
+# # hires_calc = [5,11,37,48,60,61,63,67,68]
+# hires_calc = []
+# divergence_threshold = 1.5
+# npts_increase_factor = 1.5
+# 
+# # ### FULL Bands
+# dLon = 90
+# dLat = 10
+# dSearch = 0.75*dLon
+# lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90
+# lores_npts = 2000
+# hires_npts = 8000
+# # hires_calc = [5,11,37,48,60,61,63,67,68]
+# hires_calc = []
+# divergence_threshold = 1.5
+# npts_increase_factor = 1.5
+# 
+# # ### TEST Bands and caps
+# dLon = 90
+# dLat = 10
+# dSearch = 0.75*dLon
+# lon0 = -180; lon1 = -90; lat0 = -90+dLat; lat1 = -50
+# lores_npts = 2000
+# hires_npts = 4000
+# # hires_calc = [5,11,37,48,60,61,63,67,68]
+# # hires_calc = [0,1]
+# hires_calc = []
+# divergence_threshold = 1.5
+# npts_increase_factor = 1.5
+# 
+# targetBoxes.append(mdf.BoundingBox((mdf.Point((-180, -90))\
+#                                     ,mdf.Point((180, -90+dLat)))))
+# 
+# targetBoxes.append(mdf.BoundingBox((mdf.Point((-180, 90-dLat))\
+#                                     ,mdf.Point((180, 90)))))
+
+# ### FULL with bands and caps
+dLon = 120
+dLat = 10
 dSearch = 0.75*dLon
-lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90
+lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 = 90-dLat
 lores_npts = 2000
-hires_npts = 8000
+hires_npts = 4000
 # hires_calc = [5,11,37,48,60,61,63,67,68]
+# hires_calc = [0,1]
+# hires_calc = [0,1]
 hires_calc = []
 divergence_threshold = 1.5
 npts_increase_factor = 1.5
 
-# ### FULL Bands
-dLon = 90
-dLat = 10
-dSearch = 0.75*dLon
-lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90
-lores_npts = 2000
-hires_npts = 8000
-# hires_calc = [5,11,37,48,60,61,63,67,68]
-hires_calc = []
-divergence_threshold = 1.5
-npts_increase_factor = 1.5
+cap_south = mdf.BoundingBox((mdf.Point((-180, -90))\
+                             ,mdf.Point((180, -90+dLat))))
+targetBoxes.append(cap_south)
+
+cap_north = mdf.BoundingBox((mdf.Point((-180, 90-dLat))\
+                             ,mdf.Point((180, 90))))
+targetBoxes.append(cap_north)
+
+# targetBoxes.append(mdf.BoundingBox((mdf.Point((iLon, jLat))\
+#                                     ,mdf.Point((iLon+dLon, jLat+dLat)))))
 
 # ### SMALL CENTER
 # lon0 = -30; lon1 = 30; lat0 = -30; lat1 = 30
@@ -230,10 +277,16 @@ npts_increase_factor = 1.5
 # _capture_k = 0
 # lores_npts = 2000
 # hires_npts = 4000
-# hires_calc = []
 
 for iLon in range(lon0,lon1,dLon):
     for jLat in range(lat0,lat1,dLat):
+        krigeBox = mdf.BoundingBox((mdf.Point((iLon, jLat))\
+                                    ,mdf.Point((iLon+dLon, jLat+dLat))))
+        targetBoxes.append(krigeBox)
+
+k=-1
+for krigeBox in targetBoxes:
+    for dummy in [1]:
         k=k+1
         _calculate = False
         _enable_statistics = _drive_OKrige_enable_statistics
@@ -245,11 +298,18 @@ for iLon in range(lon0,lon1,dLon):
                 _enable_statistics = True
         if _calculate:
             print 'working on tile = '+str(k)
+
+            iLon=krigeBox.p0.lon_degrees
+            jLat=krigeBox.p0.lat_degrees
+
+            dLon=krigeBox.p1.lon_degrees-krigeBox.p0.lon_degrees
+            dLat=krigeBox.p1.lat_degrees-krigeBox.p0.lat_degrees
+            
             print 'loading iLon,jLat: '+str(iLon)+','+str(jLat)
             print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
             
-            krigeBox = mdf.BoundingBox((mdf.Point((iLon, jLat))\
-                                        ,mdf.Point((iLon+dLon, jLat+dLat))))
+            # krigeBox = mdf.BoundingBox((mdf.Point((iLon, jLat))\
+            #                             ,mdf.Point((iLon+dLon, jLat+dLat))))
     
             searchBox = mdf.BoundingBox((mdf.Point((iLon-dSearch,      max(-90, min(jLat-dSearch, 90))))\
                                         ,mdf.Point((iLon+dLon+dSearch, max(-90, min(jLat+dLat+dSearch, 90))))))
@@ -424,6 +484,7 @@ for iLon in range(lon0,lon1,dLon):
             npts_in = npts
             while( True ):
                 print 'npts_in( '+str(k)+' ) = '+str(npts_in)
+                kr=0
                 kr=noggin.drive_OKrige(\
                                        grid_stride=dg\
                                        ,random_permute=True\
@@ -431,8 +492,8 @@ for iLon in range(lon0,lon1,dLon):
                                        ,src_x=longitude1\
                                        ,src_y=latitude1\
                                        ,src_z=data1\
-                                       ,variogram_model='gamma_rayleigh_nuggetless_variogram_model'\
-                                       ,variogram_function=vm.variogram_models['gamma_rayleigh_nuggetless_variogram_model'].function\
+                                       ,variogram_model=_drive_OKrige_variogram\
+                                       ,variogram_function=vm.variogram_models[_drive_OKrige_variogram].function\
                                        ,enable_plotting=_plot_variogram\
                                        ,enable_statistics=_enable_statistics\
                                        ,npts=npts_in\
@@ -452,9 +513,13 @@ for iLon in range(lon0,lon1,dLon):
                         print 'kriging diverged, max_iter exceeded, continuing to next tile'
                     break
                 else:
-                    print 'kriging diverged, increasing npts'
-                    print 'iter: ',4-max_iter
-                    npts_in = npts_in*npts_increase_factor
+                    print 'kriging diverged, changing npts, iter: ',4-max_iter
+                    if np.inf in kr.z:
+                        print 'inf detected, reducing npts'
+                        npts_in = npts_in*0.75
+                    else:
+                        print 'increasing npts'
+                        npts_in = npts_in*npts_increase_factor
                                  
             krigeSketch_results.append(kr)
 

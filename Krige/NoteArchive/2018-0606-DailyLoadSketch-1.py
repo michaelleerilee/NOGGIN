@@ -192,6 +192,7 @@ if False:
                                              ,backend=_drive_OKrige_backend\
                          ))
 
+krige_results[-1].dbg   = True
 krige_results[-1].dbg_x = longitude1
 krige_results[-1].dbg_y = latitude1
 krige_results[-1].dbg_z = data1
