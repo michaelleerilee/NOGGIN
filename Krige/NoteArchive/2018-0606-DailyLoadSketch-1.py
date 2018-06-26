@@ -73,7 +73,10 @@ vmin=-2.0; vmax=1.25
 def log_map(x):
     return np.log10(x+1.0e-9)
 
-i = "MOD08_D3.A2015304.061.2017323113710.hdf"
+# i = "MOD08_D3.A2015304.061.2017323113710.hdf"
+# i = "MOD08_D3.A2015305.061.2017323113224.hdf"
+i = "MOD08_D3.A2015306.061.2017323115110.hdf"
+
 # i = "MYD08_D3.A2015304.061.2018054061429.hdf"
 # long_name="Atmospheric_Water_Vapor_Mean"
 
@@ -192,6 +195,9 @@ if False:
                                              ,backend=_drive_OKrige_backend\
                          ))
 
+krige_results[-1].title         = modis_obj.datafilename
+krige_results[-1].zVariableName = modis_obj.datafieldname
+    
 krige_results[-1].dbg   = True
 krige_results[-1].dbg_x = longitude1
 krige_results[-1].dbg_y = latitude1
@@ -206,6 +212,12 @@ krigeSketch_results = krige_results
 
 if _graph_results:
     print 'graphing...'
+    plot_configuration = noggin.krigePlotConfiguration(marker_size = 1.75\
+                                                       ,zVariableName = krigeSketch_results[0].zVariableName\
+                                                       ,title         = krigeSketch_results[0].title\
+                                                       )
+    #                                                  ,title         = '.'.join(krigeSketch_results[0].title.split('.',3)[0:2])
+
     execfile('2018-0519-KrigeSketchPlot-1.py')
 
 end_time = time.time()

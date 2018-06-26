@@ -95,6 +95,40 @@ def center_array(a):
 
 ###########################################################################
 
+class krigePlotConfiguration(object):
+    def __init__(self\
+                 ,kriged                  = True\
+                 ,kriged_data             = True\
+                 ,kriged_outline          = False\
+                 ,source_data             = True\
+                 ,source_data_last_sample = True\
+                 ,variogram               = False\
+                 ,debug                   = True\
+                 ,verbose                 = True\
+                 ,marker_size             = 0.5\
+                 ,m_alpha                 = 1.0\
+                 ,colormap                = plt.cm.rainbow\
+                 ,vmin                    = -2.0\
+                 ,vmax                    = 1.25\
+                 ,title                   = 'title'\
+                 ,zVariableName           = 'z'\
+                 ):
+        self.kriged                  = kriged
+        self.kriged_data             = kriged_data
+        self.kriged_outline          = kriged_outline
+        self.source_data             = source_data
+        self.source_data_last_sample = source_data_last_sample
+        self.variogram               = variogram
+        self.debug                   = debug
+        self.verbose                 = verbose
+        self.marker_size             = marker_size
+        self.m_alpha                 = m_alpha
+        self.colormap                = colormap
+        self.vmin                    = vmin
+        self.vmax                    = vmax
+        self.title                   = title
+        self.zVariableName           = zVariableName
+        
 
 class krigeResults(object):
     """Capture the result of the kriging calculation and provide a place
@@ -106,6 +140,8 @@ to store debugging information as well."""
                  ,dbg_z=None,dbg_x=None,dbg_y=None\
                  ,hull=None\
                  ,box=None\
+                 ,zVariableName="z"\
+                 ,title='KrigeResultTitle'\
                  ,vg_function=None\
                  ,vg_parameters=None\
                  ,note='Default note for krigeResults'):
@@ -136,6 +172,7 @@ to store debugging information as well."""
             self.dbg = True
         else:
             self.dbg = False
+        self.title = title
         if hull is not None:
             self.hull = hull
         if box is not None:
@@ -440,7 +477,7 @@ def fit_variogram(x,y,z
     self_YCENTER = (np.amax(self_Y_ORIG) + np.amin(self_Y_ORIG))/2.0
     
     if coordinates_type == 'euclidean':
-        raise ValueError('coordinates_type euclidean NOT IMPLEMENTED.')
+        raise NotImplementedError('coordinates_type euclidean NOT IMPLEMENTED.')
         self_anisotropy_scaling = anisotropy_scaling
         self_anisotropy_angle = anisotropy_angle
         #self_X_ADJUSTED, self_Y_ADJUSTED = \
@@ -710,11 +747,18 @@ class fig_generator():
     fig  = None
     axes = None
     
-    def __init__(self,nrow,ncol):
+    def __init__(self,nrow,ncol,figsize=(2560.0/110.0,1400.0/110.0),dpi=110.0):
         self.nrowSubplots   =  nrow
         self.ncolSubplots   =  ncol
         self.nTotalSubplots =  nrow*ncol
-        plt.figure()
+        self.figsize=figsize
+        self.dpi=dpi
+        # if figsize is None:
+        #     plt.figure()
+        # else:
+        #     plt.figure(figsize=figsize,dpi=dpi)
+        #     self.figsize=figsize
+        #     self.dpi=dpi
         self.increment_figure()
         # fig, axes = plt.subplots(ncol,nrow)
         # if self.nTotalSubplots == 1:
@@ -738,7 +782,8 @@ class fig_generator():
         self.irowSubplots = self.iSubplot/self.ncolSubplots
         iSub = self.iSubIndex()
         if self.iSubplot % self.nTotalSubplots == 0:            
-            fig, axes = plt.subplots(self.ncolSubplots,self.nrowSubplots)
+            fig, axes = plt.subplots(self.ncolSubplots,self.nrowSubplots\
+                                     ,figsize=self.figsize,dpi=self.dpi)
             if self.nTotalSubplots == 1:
                 axes = [axes]
             self.fig = fig; self.axes = axes

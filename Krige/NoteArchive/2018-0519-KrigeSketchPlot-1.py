@@ -26,25 +26,28 @@ from scipy.spatial import ConvexHull
 def log_map(x):
     return np.log10(x+1.0e-9)
 
-_verbose=True
-_debug  =True
+_verbose=plot_configuration.verbose
+_debug  =plot_configuration.debug
 
-_plot_kriged                   = True
+_plot_kriged                   = plot_configuration.kriged
 # _plot_source_data_outside_grid = False
-_plot_source_data              = True
-_plot_source_data_last_sample  = False
-_plot_kriged_data              = True
-_plot_kriged_outline           = False
-_plot_variogram                = False
+_plot_source_data              = plot_configuration.source_data
+_plot_source_data_last_sample  = plot_configuration.source_data_last_sample
+_plot_kriged_data              = plot_configuration.kriged_data
+_plot_kriged_outline           = plot_configuration.kriged_outline
+_plot_variogram                = plot_configuration.variogram
 
 # marker_size = 3.5
 # marker_size = 1
-marker_size = 0.5
-m_alpha = 1.0
+# For 0.5deg map: marker_size = 0.5
+# For 1 deg map: marker_size = 1.75
+marker_size = plot_configuration.marker_size
+
+m_alpha = plot_configuration.m_alpha
 colormap_0 = plt.cm.rainbow
 colormap_1 = plt.cm.gist_yarg
 colormap_2 = plt.cm.plasma
-colormap_x = colormap_0
+colormap_x = plot_configuration.colormap
 # vmin=2.0; vmax=20.0
 # vmin=2.0; vmax=10.0
 # vmin=0.5; vmax=8.0
@@ -53,16 +56,22 @@ colormap_x = colormap_0
 # vmin=np.nanmin(data1); vmax=np.nanmax(data1)
 # For log10
 # vmin=-2.0; vmax=1.0
-vmin=-2.0; vmax=1.25
-
+#+ vmin=-2.0; vmax=1.25
+vmin = plot_configuration.vmin
+vmax = plot_configuration.vmax
 
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 print 'plot results'
 #### PLOT RESULTS ####
 #
 # fig = plt.gcf()
-fig_gen = noggin.fig_generator(1,1)
-fig,ax = plt.subplots(1,1)
+
+fig_gen = noggin.fig_generator(1,1,figsize=(2560.0/110.0,1300.0/110.0),dpi=110.0)
+# fig_gen = noggin.fig_generator(1,1)
+# fig,ax = plt.subplots(1,1)
+fig,ax = fig_gen.get_fig_axes()
+ax = ax[0]
+
 _scale = 2.0*np.pi
 wh_scale = [_scale,_scale]
 # lon_0,lat_0 = krigeBox.centroid().inDegrees()
@@ -128,6 +137,7 @@ if _plot_kriged:
                           ,s=marker_size*10\
                           ,marker='s'\
                 )
+                
             if _plot_kriged_outline:
                 noggin.draw_screen_poly( kr.x[kr.hull.vertices], kr.y[kr.hull.vertices], m )
             if _plot_kriged_data_index:
@@ -144,9 +154,12 @@ if _plot_kriged:
                                                   data=kr.dbg_z\
                                                   ,latitude=kr.dbg_y\
                                                   ,longitude=kr.dbg_x\
+                                                  ,title=kr.title\
+                                                  ,long_name=kr.zVariableName\
+                                                  ,colormesh_title=kr.title\
                 )
+                
                 modis_obj_2.scatterplot(m=m\
-                                        ,title='scatter'\
                                         ,plt_show = False\
                                         ,vmin=vmin,vmax=vmax\
                                         ,cmap=colormap_x\
@@ -160,9 +173,11 @@ if _plot_kriged:
                                                   data=kr.src_z\
                                                   ,latitude=kr.src_y\
                                                   ,longitude=kr.src_x\
+                                                  ,title=kr.title\
+                                                  ,long_name=kr.zVariableName\
+                                                  ,colormesh_title=kr.title\
                 )
                 modis_obj_3.scatterplot(m=m\
-                                        ,title='scatter'\
                                         ,plt_show = False\
                                         ,vmin=vmin,vmax=vmax\
                                         ,cmap=colormap_x\
@@ -177,6 +192,8 @@ if _plot_kriged:
             
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 print 'plt.show'
+# basename = os.path.basename(kr.title)
+plt.title('{0}\n{1}'.format(plot_configuration.title, plot_configuration.zVariableName))
 if True:
     plt.show()
 

@@ -240,7 +240,8 @@ k = -1
 dLon = 120
 dLat = 10
 dSearch = 0.75*dLon
-lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 = 90-dLat
+lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  90-dLat
+# lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 = -60-dLat
 lores_npts = 2000
 hires_npts = 4000
 # hires_calc = [5,11,37,48,60,61,63,67,68]
@@ -505,6 +506,8 @@ for krigeBox in targetBoxes:
                                        ,eps=_drive_OKrige_eps\
                                        ,backend=_drive_OKrige_backend\
                 )
+                kr.title         = modis_obj.datafilename
+                kr.zVariableName = modis_obj.datafieldname
                 kr_mx = np.nanmax(kr.z)
                 max_iter = max_iter - 1
                 print 'kr_mx,data_mx_in_grid: ',kr_mx,data_mx_in_grid
@@ -628,7 +631,15 @@ if True:
         print 'vg_parm: '+str(l)+': '+str(k.vg_parameters)
         l=l+1
 
+plot_configuration = noggin.krigePlotConfiguration(source_data              = False\
+                                                   ,source_data_last_sample = False\
+                                                   ,title         = '.'.join(krigeSketch_results[0].title.split('.',3)[0:2])\
+                                                   ,zVariableName = krigeSketch_results[0].zVariableName\
+                                                   )
+                                                   
+
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 end_time = time.time()
 print 'wall clock run time (sec) = '+str(end_time-start_time)
+
 print 'KrigeSketch done'

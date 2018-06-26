@@ -369,6 +369,7 @@ class MODIS_DataField(object):
 
     def __init__(self,datafilename=None,datafieldname=None,srcdirname="./",geofile=""\
                  ,data=None,latitude=None,longitude=None\
+                 ,title='title'
                  ,colormesh_title='colormesh_title'\
                  ,long_name='long_name'\
                  ,hack_branchcut_threshold=0\
@@ -376,8 +377,15 @@ class MODIS_DataField(object):
     ):
         """
 
-custom_loader=None. A callable(self) that allows a user to write a custom loader using a visitor pattern (https://en.wikipedia.org/wiki/Visitor_pattern). The methods load05 and load08 can be used as patterns for writing the callable.
-"""
+custom_loader=None.  A callable(self) that allows a user to write a
+  custom loader using a visitor pattern
+  (https://en.wikipedia.org/wiki/Visitor_pattern). The methods load05
+  and load08 can be used as patterns for writing the callable.
+
+        """
+        self.title                    = title
+        self.colormesh_title          = colormesh_title
+        self.long_name                = long_name
         self.datafilename             = datafilename
         self.datafieldname            = datafieldname
         self.data                     = data
@@ -457,11 +465,10 @@ custom_loader=None. A callable(self) that allows a user to write a custom loader
                                      ,hack_branchcut_threshold=self.hack_branchcut_threshold\
                                      )
         else:
-            print('separate geofile with location information not implemented!')
-            # TODO implement or raise exception
+            raise NotImplementedError('separate geofile with location information not implemented!')
+            # TODO implement
             
     def load08(self):
-        # print 'loading M?D08 not implemented'
         hdf = SD(self.srcdirname+self.datafilename, SDC.READ)
         ds  = hdf.select(self.datafieldname)
 
@@ -528,8 +535,8 @@ custom_loader=None. A callable(self) that allows a user to write a custom loader
                                      ,hack_branchcut_threshold=self.hack_branchcut_threshold\
                                      )
         else:
-            print('separate geofile with location information not implemented!')
-            # TODO implement or raise exception
+            raise NotImplementedError('separate geofile with location information not implemented!')
+            # TODO implement
         
 
     def init_basemap(self,ax=None,wh_scale=None\
@@ -594,7 +601,7 @@ custom_loader=None. A callable(self) that allows a user to write a custom loader
             title_ = self.colormesh_title
             
         # basename = os.path.basename(self.datafilename),
-        basename = os.path.basename(title_),
+        basename = os.path.basename(title_)
         plt.title('{0}\n{1}'.format(basename, self.long_name))
         fig = plt.gcf()
         # pngfile = "{0}.py.png".format(basename)
@@ -607,7 +614,8 @@ custom_loader=None. A callable(self) that allows a user to write a custom loader
     def scatterplot(self,m=None,vmin=np.nan,vmax=np.nan\
                     ,plt_show=True,ax=None\
                     ,marker_size=1\
-                    ,colorbar=False,title=None\
+                    ,colorbar=False\
+                    ,title=None\
                     ,cmap=None\
                     ,value_map=None\
                     ,edgecolors=None\
