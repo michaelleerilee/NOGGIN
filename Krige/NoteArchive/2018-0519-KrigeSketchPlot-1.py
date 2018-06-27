@@ -23,9 +23,6 @@ from mpl_toolkits.basemap import Basemap
 
 from scipy.spatial import ConvexHull
 
-def log_map(x):
-    return np.log10(x+1.0e-9)
-
 _verbose=plot_configuration.verbose
 _debug  =plot_configuration.debug
 
@@ -127,7 +124,7 @@ if _plot_kriged:
             # m.scatter(kr.x,kr.y,c=kr.z
             #    m.scatter(kr.x,kr.y,c=np.log10(kr.z+1.0e-9)\
             if _plot_kriged_data:
-                m.scatter(kr.x,kr.y,c=log_map(kr.z)\
+                m.scatter(kr.x,kr.y,c=noggin.log10_map(kr.z)\
                           ,cmap=colormap_x\
                           ,linewidth=0\
                           ,alpha=m_alpha\
@@ -164,7 +161,7 @@ if _plot_kriged:
                                         ,vmin=vmin,vmax=vmax\
                                         ,cmap=colormap_x\
                                         ,marker_size=marker_size*10\
-                                        ,value_map=log_map\
+                                        ,value_map=noggin.log10_map\
                 )
             if _plot_source_data_last_sample:
                 
@@ -182,7 +179,7 @@ if _plot_kriged:
                                         ,vmin=vmin,vmax=vmax\
                                         ,cmap=colormap_x\
                                         ,marker_size=marker_size*10\
-                                        ,value_map=log_map\
+                                        ,value_map=noggin.log10_map\
                 )
                 
                 

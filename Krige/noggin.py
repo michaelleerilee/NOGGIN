@@ -26,6 +26,22 @@ from scipy.spatial import ConvexHull
 
 import unittest
 
+###########################################################################
+
+def log10_map(x,eps=1.0e-9,inverse=False):
+    """Return the log10 (or 10**) of the argument with a floor of eps."""
+    if not inverse:
+        return np.log10(x+eps)
+    else:
+        tmp = np.power(10.0,x)
+        if isinstance(tmp, (list, tuple, np.ndarray)):
+            tmp[np.where(tmp < eps)] = eps
+        elif tmp < eps:
+            tmp = eps
+        return tmp
+
+###########################################################################
+
 rad_from_deg = pi/180.0
 
 def random_index(x0,y0,x,y,params,distribution='normal',l=-1,w=-1):
@@ -838,7 +854,19 @@ class Test_bounding_box(unittest.TestCase):
         self.assertEqual(self.bb0.overlap(self.bb2), True)        
         
     def test_ovelap_high_1(self):
-        self.assertEqual(self.bb2.overlap(self.bb0), True)        
+        self.assertEqual(self.bb2.overlap(self.bb0), True)
+
+class Test_log_map(unittest.TestCase):
+    
+    def test_log_map(self):
+        eps = 1.0e-10
+        # eps = 0
+        self.assertLess(np.abs(log_map(10)-1),eps)
+        self.assertLess(np.abs(log_map(100)-2),eps)
+        self.assertLess(np.abs(log_map(2,inverse=True)-100),eps)
+        self.assertLess(np.abs(log_map(3,inverse=True)-1000),eps)
+        self.assertLess(np.sum((log_map(np.arange(3),inverse=True)-[1,10,100])**2),eps**2)
+        self.assertLess(np.sum((log_map(np.power(10.0,np.arange(3)))-[0,1,2])**2),100.0*eps**2)
     
 ###########################################################################
 

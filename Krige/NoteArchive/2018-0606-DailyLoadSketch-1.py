@@ -42,11 +42,11 @@ _drive_OKrige_weight  = False
 _drive_OKrige_verbose = False
 _drive_OKrige_eps     = 1.0e-10
 _drive_OKrige_backend = 'vectorized'
+_drive_OKrige_plot_variogram      = False
+_drive_OKrige_enable_statistics   = False
 
 _graph_results = True
 
-_plot_variogram      = False
-_enable_statistics   = False
 ##
 
 SRC_DIRECTORY_BASE=mdf.data_src_directory()
@@ -54,12 +54,6 @@ SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS-61/'
 
 # marker_size = 3.5
 # marker_size = 1
-marker_size = 0.5
-m_alpha = 1.0
-colormap_0 = plt.cm.rainbow
-colormap_1 = plt.cm.gist_yarg
-colormap_2 = plt.cm.plasma
-colormap_x = colormap_0
 # vmin=2.0; vmax=20.0
 # vmin=2.0; vmax=10.0
 # vmin=0.5; vmax=8.0
@@ -69,9 +63,6 @@ colormap_x = colormap_0
 # For log10
 # vmin=-2.0; vmax=1.0
 vmin=-2.0; vmax=1.25
-
-def log_map(x):
-    return np.log10(x+1.0e-9)
 
 # i = "MOD08_D3.A2015304.061.2017323113710.hdf"
 # i = "MOD08_D3.A2015305.061.2017323113224.hdf"
@@ -90,12 +81,19 @@ modis_obj = mdf.MODIS_DataField(\
 _plot_modis_obj = False
 if _plot_modis_obj:
     # modis_obj.scatterplot(m=m
+    marker_size = 0.5
+    m_alpha = 1.0
+    colormap_0 = plt.cm.rainbow
+    colormap_1 = plt.cm.gist_yarg
+    colormap_2 = plt.cm.plasma
+    colormap_x = colormap_0
+    vmin=-2.0; vmax=1.25
     modis_obj.scatterplot(m=None\
                           ,plt_show = False\
                           ,vmin=vmin,vmax=vmax\
                           ,cmap=colormap_x\
                           ,marker_size=marker_size*2\
-                          ,value_map=log_map
+                          ,value_map=noggin.log10_map
     )
     plt.show()
 
@@ -128,72 +126,36 @@ w=lw_scale*(dy/2)
 npts = 2000
 
 nlags=_drive_OKrige_nlags
-custom_args = None
-vg_model = 'custom'
 
-# A gamma-rayleigh distribution
-def custom_vg(params,dist):
-    sill    = np.float(params[0])
-    falloff = np.float(params[1])
-    beta    = np.float(params[2])
-    fd      = falloff*dist
-    omfd    = 1.0-falloff*dist
-    bfd2    = beta*omfd*omfd
-    return \
-        sill*fd*np.exp(omfd-bfd2)
-
-
-# The 'custom_args' actually used.
+# The args actually used.
 variogram_parameters = []
 
 krige_results = []
 
 krige_results.append(\
                      noggin.drive_OKrige(\
-                                         grid_stride=dg\
-                                         ,random_permute=True\
-                                         ,x=gridx,y=gridy\
-                                         ,src_x=longitude1\
-                                         ,src_y=latitude1\
-                                         ,src_z=data1\
-                                         ,variogram_model='gamma_rayleigh_nuggetless_variogram_model'\
-                                         ,variogram_function=vm.variogram_models['gamma_rayleigh_nuggetless_variogram_model'].function\
-                                         ,enable_plotting=_plot_variogram\
-                                         ,enable_statistics=_enable_statistics\
-                                         ,npts=npts\
-                                         ,beta0=beta0\
-                                         ,frac=0.0\
-                                         ,l=l,w=w\
-                                         ,weight=_drive_OKrige_weight\
-                                         ,verbose=_drive_OKrige_verbose\
-                                         ,eps=_drive_OKrige_eps\
-                                         ,backend=_drive_OKrige_backend\
+                                         grid_stride         = dg\
+                                         ,random_permute     = True\
+                                         ,x                  = gridx\
+                                         ,y                  = gridy\
+                                         ,src_x              = longitude1\
+                                         ,src_y              = latitude1\
+                                         ,src_z              = data1\
+                                         ,variogram_model    = 'gamma_rayleigh_nuggetless_variogram_model'\
+                                         ,variogram_function = vm.variogram_models['gamma_rayleigh_nuggetless_variogram_model'].function\
+                                         ,enable_plotting    = _drive_OKrige_plot_variogram\
+                                         ,enable_statistics  = _drive_OKrige_enable_statistics\
+                                         ,npts               = npts\
+                                         ,beta0              = beta0\
+                                         ,frac               = 0.0\
+                                         ,l                  = l\
+                                         ,w                  = w\
+                                         ,weight             = _drive_OKrige_weight\
+                                         ,verbose            = _drive_OKrige_verbose\
+                                         ,eps                = _drive_OKrige_eps\
+                                         ,backend            = _drive_OKrige_backend\
                      ))
 
-
-if False:
-    krige_results.append(\
-                         noggin.drive_OKrige(\
-                                             grid_stride=dg\
-                                             ,random_permute=True\
-                                             ,x=gridx,y=gridy\
-                                             ,src_x=longitude1\
-                                             ,src_y=latitude1\
-                                             ,src_z=data1\
-                                             ,variogram_model=vg_model\
-                                             ,variogram_parameters=custom_args\
-                                             ,variogram_function=custom_vg\
-                                             ,enable_plotting=_plot_variogram\
-                                             ,enable_statistics=_enable_statistics\
-                                             ,npts=npts\
-                                             ,beta0=beta0\
-                                             ,frac=0.0\
-                                             ,l=l,w=w\
-                                             ,weight=_drive_OKrige_weight\
-                                             ,verbose=_drive_OKrige_verbose\
-                                             ,eps=_drive_OKrige_eps\
-                                             ,backend=_drive_OKrige_backend\
-                         ))
 
 krige_results[-1].title         = modis_obj.datafilename
 krige_results[-1].zVariableName = modis_obj.datafieldname
