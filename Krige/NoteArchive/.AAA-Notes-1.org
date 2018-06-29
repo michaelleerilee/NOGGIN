@@ -1,0 +1,189 @@
+
+Development notes.  ML Rilee, RSTLLC, mike@rilee.net
+
+## One can grep for TODO and note throughout the code for important notes.
+
+* 2018-0530-2113 KrigeSketch and supporting scripts
+
+** 2018-0518-KrigeSketch-1.py - krige the planet
+Iterate over the tiled planet, kriging the tiles from our data source.
+
+Lots of debugging switches. _capture* is used to capture a single
+tile for later analysis via the KrigeSketchPlot scripts.
+
+Provides the class krigeResults to aid the iteration over and
+collection of results.
+
+Loads metadata collected by 2018-0330-MetaData-1.py.
+
+Can capture a tile and associated data for debugging.
+
+** 2018-0519-KrigeSketchPlot-1.py - graph the kriged planet
+Graph the whole tiled Earth using data from KrigeSketch.
+
+** 2018-0521-KrigeSketchPlot-1.py - graph data associated with a captured tile
+Plot a single tile and related information from KrigeSketch for debugging.
+
+** 2018-0524-SourceDataSketch-1.py - graph the source data, all of it
+Plot the source data.  All of it.
+
+** 2018-0330-MetaData-1.py - collect the metadata from the source files
+
+** MODIS_DataField.py provides BoundingBox and HDF access functions
+
+
+* 2018-0529-1515 Krige parameterizations
+
+** Variogram modelling
+
+variogram_model
+variogram_function
+variogram_parameters
+nlags
+
+** Arguments to drive_OKrige -- Ordinary Kriging
+*** Notes
+
+This routine drives PyKrige's ok.OrdinaryKriging class and shares many
+of its arguments with OrdinaryKriging's constructor.
+
+Note: currently assumes positive data and uses log(data) for its calculations.
+
+drive_OKrige takes as input source data (src_x,src_y,src_z) and target
+grid information (x,y) and then calculates a kriged estimate (gridz)
+and variance (gridss), aka sigmasq in PyKrige.
+
+Due to potentially very large source and target arrays, source data
+may be adaptively, randomly sub-sampled and the target array may be
+calculated in multiple steps. 
+
+Note: currently, adaptive_index is always called.
+
+*** grid_stride - integer - krige over subarrays of the target
+controls the number of times we iterate over the target grid. The
+routine uses sub-arrays of the input target grid, chosen by stepping
+through the the full target with grid_stride.
+
+The target array is calculated in steps by setting a stride for the
+routine's iteration through the target array. By default grid_stride
+is set to one, which means that the target array is calculated
+(kriged) all at once.
+
+A stride of 1 corresponds to using the whole original target for the
+krige calculation. A stride of 2 leads to calculating two sets of
+kriged estimates, one for the even index coordinates and another for
+the odd.
+
+Note: at present each krige calculation fits its own variogram model
+to the source data, if no variogram_parameters are passed into the
+routine.
+
+Note: adaptive or random indexing is usually in place,
+i.e. subsampling of source data to reduce computational requirements,
+so kriging to adjacent target grid locations will lead to some
+graininess in the result. This variation should be within the scale of
+the statistical variation expected for kriging, estimated via gridss.
+
+*** random_permute - boolean - randomly reorder the data 
+so that a partitioning in index space spreads partitions across the
+spatial extent of the data. The idea is to avoid artifacts due to 
+partitioning and parallel compuatation. 
+
+Note that for the current project, tiles are passed to this routine,
+drive_OKrige for separate calculation.
+
+*** variogram_model - string - select which variogram function to use. 'custom' only
+!!! NOTE ONLY CUSTOM IS ALLOWED AT THIS TIME !!!
+
+This parameter is used to select the variogram function that the
+routine will use. As currently structured, we pass in our gamma-rayleigh
+distribution as a 'custom' model. Passed to OrdinaryKriging.
+*** variogram_parameters - a list of parameters for the variogram_function
+The number and kind of parameters depends on the variogram_function,
+to which variogram_parameters is passed. If 'None,'
+variogram_parameters is determined by fitting variogram_function to
+the source data. If it is not 'None,' then the parameters are passed
+directly to variogram_function during the kriging calculation, without
+any separate fitting step.
+
+Passed to OrdinaryKriging.
+
+*** variogram_function - callable, 2 arguments (parameters, distances)
+This is the callable function used to model the variogram for the kriging
+calculation. As stated in PyKrige's documentation, it takes 2
+arguments: (1) a list, variogram_parameters described above, and
+(2) the distances at which to calculate the variogram model.
+
+Passed to OrdinaryKriging.
+
+*** nlags - the number of lags to use in the fitting of the variogram model
+Passed to OrdinaryKriging.
+*** weight - boolean - optional - increase influence of smaller lags on variogram fit
+Optional and only used when automatically fitting the variogram model.
+
+Passed to OrdinaryKriging.
+*** enable_plotting - boolean - optional - graph the variogram model
+Passed to OrdinaryKriging.
+
+Not so useful when iterating.
+
+*** npts - integer - minimum number of points for v'gram calc. passed to adaptive_index
+*** beta0 - float - scale for random sampling - passed to adaptive_index
+*** frac - float - scale for changing (adapting) sampling - passed to adaptive_index
+*** l,w - bounding box dimensions, 1/2-length and 1/2-width - passed to adaptive_index
+** Functions supporting drive_OKrige
+*** adaptive_index - constructs index for subsampling
+**** Notes 
+Attempts to come up with an index subsampling the source data, such
+that the subsampled set is larger than a minimum number of points
+(npts). If it fails, it returns its current subsampling index.
+
+TODO: The routine used to raise an exception if it did not find enough
+points, but the rest of the driver code is not up to dealing with that
+exception at present.
+**** npts  - minimum number of points sought for the calculation
+**** beta0 - the (starting) scale parameter for random_index
+**** frac  - the fraction by which to decrease beta by
+**** l,w   - spatial bounding box for index
+**** distribution - text - select the spatial sampling distribution
+Passed to random_index.
+
+*** random_index
+**** x0, y0 - the "central" control point of the calculation
+**** x,  y  - the coordinates of the data
+**** params - controls the "tightness" of the sample index about x0, y0
+**** distribution - probability distribution based on distance and a scale parameter
+***** normal
+params corresponds to "sigma," the length scale, exp(-x2/sigma2)
+***** exponential
+params corresponds to the 1/e reciprocal length scale
+***** power-law
+params corresponds to the negative of the log-log slope
+**** l,w - float,float - bounding box centered on x0,y0 with dimensions 2*l,2*w
+restricts index to a bounding box centered on x0,y0 with dimensions 2*l,2*w
+
+
+* 2018-0522-1123 Krige Sketching and plotting
+
+Build the calculation for kriging the whole planet. Separated
+calculation from plotting, since the latter requires more rapid
+iterations in actual use.
+
+** 2018-0518-KrigeSketch-1.py
+Iterate over the tiled planet, kriging the tiles from our data source.
+
+Lots of debugging switches. _capture* is used to capture a single
+tile for later analysis via the KrigeSketchPlot scripts.
+
+** 2018-0519-KrigeSketchPlot-1.py
+Plot the whole tiled Earth using data from KrigeSketch.
+
+** 2018-0521-KrigeSketchPlot-1.py
+Plot a single tile and related information from KrigeSketch for debugging.
+
+
+* 2018-0417-1408-32-EDT ML Rilee, RSTLLC, mike@rilee.net. provenance
+
+provenance
+
+

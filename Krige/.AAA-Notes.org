@@ -1,0 +1,46 @@
+
+
+* Environment Variables
+
+NOGGIN_DATA_SRC_DIRECTORY=/Users/mrilee/data/NOGGIN/
+
+PYTHONPATH=/Users/mrilee/Dropbox/NOGGIN/src/noggin-github-1/Krige
+
+* Various notes
+
+** 2018-0423-2136 Verified old code ran, produced visusals on new linux platorm.
+
+** Dependencies
+
+** As of 2018-0423
+
+pykrige 
+pyhdf
+matplotlib
+basemap
+numpy
+scipy
+HDF4
+
+In Fedora, via dnf 
+- redhat-rpm-config, python-basemap, hdf-devel, python2-devel, python2-numpy, python-scipy
+
+In Fedora, via pip
+- pykrige
+
+
+** Consider python environment
+anaconda?
+conda?
+pip?
+
+** Emacs
+
+*** To evaluate the whole buffer: C-uC-c-C-c
+
+** History
+
+*** 2018-0416-2118-26-EDT Initial item
+
+
+
