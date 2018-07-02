@@ -12,7 +12,7 @@ from pyhdf.SD import SD, SDC
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
-from noggin import fig_generator, data_src_directory
+from Krige import fig_generator, data_src_directory
 
 import unittest
 
@@ -427,7 +427,24 @@ custom_loader=None.  A callable(self) that allows a user to write a
         # ds_dims = [ds.dimensions()[i] for i in ds.dimensions().keys()]
 
         self.colormesh_title = self.datafilename
-        
+
+        # TODO MLR There must be a better way to get this information!!!
+        # print 'ds-keys: ',ds.dimensions().keys()
+        if "Cell_Along_Swath_1km:mod05" in ds.dimensions().keys():
+            # Need to load geolocation data from MOD03
+            if self.geofile == "":
+                raise ValueError("Determined external geolocation data needed, but geofile not set to MOD03...")
+            geo = SD(self.srcdirname+self.geofile,SDC.READ)
+            self.key_along  = "Cell_Along_Swath_1km:mod05"
+            self.key_across = "Cell_Across_Swath_1km:mod05"
+            self.key_units  = 'unit'
+        elif "Cell_Along_Swath_5km" in ds.dimensions().keys():
+            self.key_along  = "Cell_Along_Swath_5km:mod05"
+            self.key_across = "Cell_Across_Swath_5km:mod05"
+            self.key_units  = 'units'
+        else:
+            raise ValueError("Can't determine geolocation information from 'Cell_Along_Swath_?km'.")
+            
         nAlong  = ds.dimensions()[self.key_along]
         nAcross = ds.dimensions()[self.key_across]
 
@@ -458,15 +475,17 @@ custom_loader=None.  A callable(self) that allows a user to write a
 
         if self.geofile == "":
             lat = hdf.select('Latitude')
-            self.latitude = lat[:,:]
             lon = hdf.select('Longitude')
-            self.longitude = lon[:,:]
-            self.bbox = box_covering(self.longitude,self.latitude\
-                                     ,hack_branchcut_threshold=self.hack_branchcut_threshold\
-                                     )
         else:
-            raise NotImplementedError('separate geofile with location information not implemented!')
+            # raise NotImplementedError('separate geofile with location information not implemented!')
             # TODO implement
+            lat = geo.select('Latitude')
+            lon = geo.select('Longitude')
+        self.latitude = lat[:,:]
+        self.longitude = lon[:,:]
+        self.bbox = box_covering(self.longitude,self.latitude\
+                                 ,hack_branchcut_threshold=self.hack_branchcut_threshold\
+        )
             
     def load08(self):
         hdf = SD(self.srcdirname+self.datafilename, SDC.READ)
