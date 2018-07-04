@@ -126,6 +126,7 @@ class krigePlotConfiguration(object):
                  ,colormap                = plt.cm.rainbow\
                  ,vmin                    = -2.0\
                  ,vmax                    = 1.25\
+                 ,vmap                    = None\
                  ,title                   = 'title'\
                  ,zVariableName           = 'z'\
                  ):
@@ -142,6 +143,7 @@ class krigePlotConfiguration(object):
         self.colormap                = colormap
         self.vmin                    = vmin
         self.vmax                    = vmax
+        self.vmap                    = vmap
         self.title                   = title
         self.zVariableName           = zVariableName
         
@@ -563,6 +565,7 @@ def fit_variogram(x,y,z
 def drive_OKrige(
         x,y
         ,src_x,src_y,src_z
+        ,log_calc=True
         ,grid_stride=1
         ,random_permute=False
         ,variogram_model=None
@@ -624,7 +627,10 @@ and the data_ and the variogram_parameters of the last sub-calculation.
         data_x1[idltz] = data_x1[idltz] + 360.0
         data_y = src_y[idx]
         data_z = src_z[idx]
-        data_z1= np.log(data_z)
+        if log_calc:
+            data_z1= np.log(data_z)
+        else:
+            data_z1= np.copy(data_z)
 
         if calculate_parms:
             # Find parms
@@ -688,7 +694,10 @@ and the data_ and the variogram_parameters of the last sub-calculation.
 	    # gridss[i:i+grid_stride] = ss[:]
             if verbose:
                 print('driveOKrige isample,mnmx(ln(z)): ',isample,np.nanmin(z),np.nanmax(z))
-	    gridz [isample] = np.exp(z[:])
+            if log_calc:
+	        gridz [isample] = np.exp(z[:])
+            else:
+	        gridz [isample] = z[:]
 	    gridss[isample] = ss[:]
     # TODO Need to return gridss
     return krigeResults(s              = gridss\

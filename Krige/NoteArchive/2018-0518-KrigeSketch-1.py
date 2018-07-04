@@ -481,7 +481,9 @@ for krigeBox in targetBoxes:
             vmin=1.0; vmax=5.0
             # vmin=np.nanmin(data1); vmax=np.nanmax(data1)
 
-            max_iter = 5
+            inf_detected = False
+            max_iter_start = 5
+            max_iter = max_iter_start
             npts_in = npts
             while( True ):
                 print 'npts_in( '+str(k)+' ) = '+str(npts_in)
@@ -516,10 +518,16 @@ for krigeBox in targetBoxes:
                         print 'kriging diverged, max_iter exceeded, continuing to next tile'
                     break
                 else:
-                    print 'kriging diverged, changing npts, iter: ',4-max_iter
+                    print 'kriging diverged, changing npts, iter: ',max_iter_start-1-max_iter
                     if np.inf in kr.z:
-                        print 'inf detected, reducing npts'
-                        npts_in = npts_in*0.75
+                        if inf_detected:
+                            print 'inf detected again, increasing npts'
+                            npts_in = npts_in*npts_increaase_factor
+                            inf_detected = False
+                        else:
+                            print 'inf detected, reducing npts'
+                            npts_in = npts_in*0.75
+                            inf_detected = True
                     else:
                         print 'increasing npts'
                         npts_in = npts_in*npts_increase_factor
@@ -632,10 +640,11 @@ if True:
         l=l+1
 
 plot_configuration = Krige.krigePlotConfiguration(source_data              = False\
-                                                   ,source_data_last_sample = False\
-                                                   ,title         = '.'.join(krigeSketch_results[0].title.split('.',3)[0:2])\
-                                                   ,zVariableName = krigeSketch_results[0].zVariableName\
-                                                   )
+                                                  ,source_data_last_sample = False\
+                                                  ,title         = '.'.join(krigeSketch_results[0].title.split('.',3)[0:2])\
+                                                  ,zVariableName = krigeSketch_results[0].zVariableName\
+                                                  ,vmap          = Krige.log10_map\
+)
                                                    
 
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())

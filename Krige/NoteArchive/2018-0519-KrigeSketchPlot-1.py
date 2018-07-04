@@ -54,6 +54,7 @@ colormap_x = plot_configuration.colormap
 # For log10
 # vmin=-2.0; vmax=1.0
 #+ vmin=-2.0; vmax=1.25
+vmap = plot_configuration.vmap
 vmin = plot_configuration.vmin
 vmax = plot_configuration.vmax
 
@@ -124,7 +125,7 @@ if _plot_kriged:
             # m.scatter(kr.x,kr.y,c=kr.z
             #    m.scatter(kr.x,kr.y,c=np.log10(kr.z+1.0e-9)\
             if _plot_kriged_data:
-                m.scatter(kr.x,kr.y,c=Krige.log10_map(kr.z)\
+                m.scatter(kr.x,kr.y,c=vmap(kr.z)\
                           ,cmap=colormap_x\
                           ,linewidth=0\
                           ,alpha=m_alpha\
@@ -161,7 +162,7 @@ if _plot_kriged:
                                         ,vmin=vmin,vmax=vmax\
                                         ,cmap=colormap_x\
                                         ,marker_size=marker_size*10\
-                                        ,value_map=Krige.log10_map\
+                                        ,value_map=vmap\
                 )
             if _plot_source_data_last_sample:
                 
@@ -179,7 +180,7 @@ if _plot_kriged:
                                         ,vmin=vmin,vmax=vmax\
                                         ,cmap=colormap_x\
                                         ,marker_size=marker_size*10\
-                                        ,value_map=Krige.log10_map\
+                                        ,value_map=vmap\
                 )
                 
                 
