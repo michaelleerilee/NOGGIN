@@ -24,6 +24,9 @@ from scipy.optimize import minimize
 from scipy.optimize import least_squares
 from scipy.spatial import ConvexHull
 
+import h5py
+import json
+
 import unittest
 
 ###########################################################################
@@ -152,17 +155,21 @@ class krigeResults(object):
     """Capture the result of the kriging calculation and provide a place
 to store debugging information as well."""
     def __init__(self\
-                 ,s=None\
-                 ,z=None,x=None,y=None\
+                 ,z=None,s=None,x=None,y=None\
+                 ,z2=None,s2=None,x2=None,y2=None\
                  ,src_z=None,src_x=None,src_y=None\
                  ,dbg_z=None,dbg_x=None,dbg_y=None\
                  ,hull=None\
                  ,box=None\
                  ,zVariableName="z"\
                  ,title='KrigeResultTitle'\
+                 ,vg_name=None\
                  ,vg_function=None\
                  ,vg_parameters=None\
-                 ,note='Default note for krigeResults'):
+                 ,npts=None\
+                 ,log_calc=None\
+                 ,note='Default note for krigeResults'\
+    ):
         self.clear()
         if x is not None:
             self.x=x.copy()
@@ -170,6 +177,12 @@ to store debugging information as well."""
             self.y=y.copy()
         if z is not None:
             self.z=z.copy()
+        # Save a few for use later
+        self.x2 = x2
+        self.y2 = y2
+        self.z2 = z2
+        self.s2 = s2
+        self.zVariableName = zVariableName
         if s is not None:
             self.s=s.copy()
         if src_x is not None:
@@ -197,10 +210,14 @@ to store debugging information as well."""
             self.box = box.copy()
         else:
             self.box = None
+        self.vg_name = vg_name
         if vg_parameters is not None:
             self.vg_parameters = vg_parameters
         if vg_function is not None:
             self.vg_function = vg_function
+        # Number of points sampled
+        self.npts = npts
+        self.log_calc = log_calc
         self.note = str(note)
         self.sort_on_longitude()
         self.construct_hull()
@@ -209,6 +226,8 @@ to store debugging information as well."""
            and self.y is not None \
            and self.z is not None:
             idx = self.x.argsort()
+            # print '100: x.shape: ',self.x.shape
+            # print '110: y.shape: ',self.y.shape
             self.y = self.y[idx[::-1]]
             self.z = self.z[idx[::-1]]
             self.x = self.x[idx[::-1]]
@@ -258,6 +277,93 @@ to store debugging information as well."""
             xy1[:,0] = self.x
             xy1[:,1] = self.y
             self.hull = ConvexHull(xy1)
+    def save(self,output_filename='krige_result.hdf5',output_type='hdf5'):
+        with h5py.File(output_filename,'w') as f:
+
+            nx,ny = self.y2.shape
+
+            # Group: /HDFEOS
+            grp_1 = f.create_group('HDFEOS')
+            
+            # Group: /HDFEOS/SWATHS
+            grp_2 = grp_1.create_group('SWATHS')
+            
+            # Group: /HDFEOS/SWATHS/Swath2953
+            grp_3 = grp_2.create_group('Swath2953')
+            
+            # Group: /HDFEOS/SWATHS/Swath2953/Geolocation Fields
+            grp_4 = grp_3.create_group('Geolocation Fields')
+
+# TODO need to go back to some sort of 2D array.
+            # Dataset: /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Latitude
+            dt = np.dtype('<f8')
+            dset = grp_4.create_dataset('Latitude', (nx,ny), maxshape=(nx,ny), dtype=dt)
+            # initialize dataset values here
+            dset[:,:] = self.y2
+            
+            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Latitude
+            dset.attrs['units'] = "degrees_north"
+            
+            # Dataset: /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Longitude
+            dt = np.dtype('<f8')
+            dset = grp_4.create_dataset('Longitude', (nx,ny), maxshape=(nx,ny), dtype=dt)
+            # initialize dataset values here
+            dset[:,:] = self.x2
+            
+            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Longitude
+            dset.attrs['units'] = "degrees_east"
+            
+            # Dataset: /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Time
+            dt = np.dtype('<f8')
+            dset = grp_4.create_dataset('Time', (1,), maxshape=(1,), dtype=dt)
+            # initialize dataset values here
+            dset[:] = 0.0
+                        
+            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Time
+            dset.attrs['units'] = "seconds since 1993-01-01 00:00:00.000000Z"
+            
+            # Group: /HDFEOS/SWATHS/Swath2953/Data Fields
+            grp_4 = grp_3.create_group('Data Fields')
+            
+            # Dataset: /HDFEOS/SWATHS/Swath2953/Data Fields/temperature
+            dt = np.dtype('<f8')
+            dset = grp_4.create_dataset('temperature', (nx,ny), maxshape=(nx,ny), dtype=dt)
+            # initialize dataset values here
+            dset[:,:] = self.z2
+            
+            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Data Fields/temperature
+            dset.attrs['units'] = "K"
+            
+            dset.attrs['coordinates'] = "latitude longitude"
+            
+            # Group: /HDFEOS INFORMATION
+            grp_1 = f.create_group('HDFEOS INFORMATION')
+            
+            # Dataset: /HDFEOS INFORMATION/StructMetadata.0
+            dt = np.dtype('S1')
+            dset = grp_1.create_dataset('StructMetadata.0', (), dtype=dt)
+            # initialize dataset values here
+            
+            
+            # METADATA STRUCTURE
+            
+            # Close the file
+            # f.close()
+            
+            dset = f.create_dataset('metadata.json'\
+                                    ,data=json.dumps(\
+                                                     {"npts":self.npts\
+                                                      ,"log_calc":self.log_calc\
+                                                      ,"note":self.note\
+                                                      ,"vg_name":self.vg_name\
+                                                     }\
+                                                     ,sort_keys=True))
+            # dset = f.create_dataset(self.zVariableName,data=self.z)
+            # dset = f.create_dataset(self.zVariableName+'_s',data=self.s)
+            # dset = f.create_dataset('x',data=self.x)
+            # dset = f.create_dataset('y',data=self.y)
+            
+
 
 ###########################################################################
 
@@ -865,17 +971,62 @@ class Test_bounding_box(unittest.TestCase):
     def test_ovelap_high_1(self):
         self.assertEqual(self.bb2.overlap(self.bb0), True)
 
-class Test_log_map(unittest.TestCase):
+class Test_log10_map(unittest.TestCase):
     
-    def test_log_map(self):
+    def test_log10_map(self):
         eps = 1.0e-10
         # eps = 0
-        self.assertLess(np.abs(log_map(10)-1),eps)
-        self.assertLess(np.abs(log_map(100)-2),eps)
-        self.assertLess(np.abs(log_map(2,inverse=True)-100),eps)
-        self.assertLess(np.abs(log_map(3,inverse=True)-1000),eps)
-        self.assertLess(np.sum((log_map(np.arange(3),inverse=True)-[1,10,100])**2),eps**2)
-        self.assertLess(np.sum((log_map(np.power(10.0,np.arange(3)))-[0,1,2])**2),100.0*eps**2)
+        self.assertLess(np.abs(log10_map(10)-1),eps)
+        self.assertLess(np.abs(log10_map(100)-2),eps)
+        self.assertLess(np.abs(log10_map(2,inverse=True)-100),eps)
+        self.assertLess(np.abs(log10_map(3,inverse=True)-1000),eps)
+        self.assertLess(np.sum((log10_map(np.arange(3),inverse=True)-[1,10,100])**2),eps**2)
+        self.assertLess(np.sum((log10_map(np.power(10.0,np.arange(3)))-[0,1,2])**2),100.0*eps**2)
+
+class Test_krigeResult(unittest.TestCase):
+
+# Need to use a SWATH mode for the krigeResult
+    
+    def test_save(self):
+        output_filename = 'test.hdf5'
+        x,y = np.meshgrid(np.arange(-180,180),np.arange(-90,90))
+        x = x.reshape(180/4,360*4)
+        y = y.reshape(180/4,360*4)
+        z   = x**2 +y**2
+        x1 = np.ravel(x)
+        y1 = np.ravel(y)
+        z1 = np.ravel(z)
+        print 'x.shape:  ',x.shape
+        print 'y.shape:  ',y.shape
+        print 'z.shape:  ',z.shape
+        print 'x1.shape: ',x1.shape
+        print 'y1.shape: ',y1.shape
+        print 'z1.shape: ',z1.shape
+        kr=krigeResults(vg_name        = 'vg_name'\
+                        ,zVariableName = 'z1'\
+                        ,x             = x1\
+                        ,y             = y1\
+                        ,z             = z1\
+                        ,s             = -z1\
+                        ,x2            = x\
+                        ,y2            = y\
+                        ,z2            = z\
+                        ,s2            = -z
+                        )
+        kr.save(output_filename=output_filename)
+
+        # print 'kr.z: ',kr.z
+        
+        metadata = ''
+        with h5py.File(output_filename,'r') as f:
+            metadata = json.loads(f['metadata.json'][()])
+            self.assertEqual(metadata['vg_name']   ,kr.vg_name)
+            self.assertEqual(metadata['npts']      ,kr.npts)
+            self.assertEqual(metadata['log_calc']  ,kr.log_calc)
+            # z = f['z'][:]
+            # self.assertEqual(z[0],3.0)
+            # self.assertEqual(z[1],2.0)
+            # self.assertEqual(z[3],1.0)
     
 ###########################################################################
 

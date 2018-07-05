@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 
-Graph the source data.
+Load the L3 daily data, then try to graph.
 
 ML Rilee, RSTLLC, mike@rilee.net for NASA/ACCESS-15/KRIGE.
 
