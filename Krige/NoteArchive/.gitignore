@@ -1,1 +1,5 @@
 test.hdf5
+*.hdf
+*.hdf5
+*.he5
+*.nc
