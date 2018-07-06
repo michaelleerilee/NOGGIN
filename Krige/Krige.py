@@ -177,11 +177,17 @@ to store debugging information as well."""
             self.y=y.copy()
         if z is not None:
             self.z=z.copy()
-        # Save a few for use later
-        self.x2 = x2
-        self.y2 = y2
-        self.z2 = z2
-        self.s2 = s2
+        if x2 is not None:
+            self.x2 = x2.copy()
+        if y2 is not None:
+            self.y2 = y2.copy()
+        if z2 is not None:
+            self.z2 = z2.copy()
+        if z2 is not None:
+            self.z2 = z2.copy()
+        if x2 is not None:
+            self.s2 = s2.copy()
+            
         self.zVariableName = zVariableName
         if s is not None:
             self.s=s.copy()
@@ -277,19 +283,84 @@ to store debugging information as well."""
             xy1[:,0] = self.x
             xy1[:,1] = self.y
             self.hull = ConvexHull(xy1)
-    def save(self,output_filename='krige_result.hdf5',output_type='hdf5'):
-        with h5py.File(output_filename,'w') as f:
+            
+###########################################################################
 
-            nx,ny = self.y2.shape
+class krigeHDF(object):
+    def __init__(self\
+                 ,krg_z=None,krg_s=None,krg_x=None,krg_y=None\
+                 ,src_z=None,src_x=None,src_y=None\
+                 ,orig_z=None,orig_x=None,orig_y=None\
+                 ,krg_name='krg_name'\
+                 ,src_name='src_name'\
+                 ,orig_name='orig_name'\
+                 ,krg_units='kr_units'\
+                 ,src_units='kr_units'\
+                 ,orig_units='kr_units'\
+                 ,output_filename ='krigeHDF-test.hdf'\
+                 ,n_across = 180\
+                 ):
+        """Support saving krige results in an HDF (EOS) compatible way, so that tools like Panoply might be used.
+
+Krige results are to be stored in the krig_? arguments.
+
+Krige inputs are to be stored in src_? arguments, which may have been sampled from the original data.
+
+The true input data is to be stored in orig_? arguments. 
+
+The shape of the orig_? arrays is used to format the datasets written to output file, and np.nan is expected as a fill value.
+"""
+        self.krg_z           = krg_z
+        self.krg_s           = krg_s
+        self.krg_x           = krg_x
+        self.krg_y           = krg_y
+        self.krg_name        = krg_name
+        self.krg_units       = krg_units
+        self.src_z           = src_z
+        self.src_x           = src_x
+        self.src_y           = src_y
+        self.src_name        = src_name
+        self.src_units       = src_units
+        self.orig_z          = orig_z
+        self.orig_x          = orig_x
+        self.orig_y          = orig_y
+        self.orig_name       = orig_name
+        self.orig_units      = orig_units
+        self.output_filename = output_filename
+
+        orig_and_krg = np.zeros(self.orig_x.shape)
+        krg = np.zeros(self.orig_x.shape)
+        orig_and_krg[:,:] = self.orig_z
+        krg[:,:] = np.nan
+
+        for i in range(len(self.krg_x)):
+            x = self.krg_x[i]
+            y = self.krg_y[i]
+            idx = np.where( (self.orig_x == x) & (self.orig_y == y) )
+            # If len(idx) != 2 error.
+            orig_and_krg[idx[0],idx[1]] = self.krg_z[i]
+            krg[idx[0],idx[1]] = self.krg_z[i]
+            
+        self.x2 = self.orig_x
+        self.y2 = self.orig_y
+        self.z2 = orig_and_krg
+        self.orig_and_krg = orig_and_krg
+        self.krg = krg
+        
+    def save(self):
+        """Save the krige, source, and krige+source data to a file. Should figure out a way to control the format of the file and provide information about the 'grid.' This is necessary if we want the krige output to be compatible with NOGGIn regridding."""
+        with h5py.File(self.output_filename,'w') as f:
+
+            nx,ny = self.x2.shape
 
             # Group: /HDFEOS
             grp_1 = f.create_group('HDFEOS')
             
             # Group: /HDFEOS/SWATHS
-            grp_2 = grp_1.create_group('SWATHS')
+            grp_2 = grp_1.create_group('NOGGIN')
             
             # Group: /HDFEOS/SWATHS/Swath2953
-            grp_3 = grp_2.create_group('Swath2953')
+            grp_3 = grp_2.create_group('KrigeResult1')
             
             # Group: /HDFEOS/SWATHS/Swath2953/Geolocation Fields
             grp_4 = grp_3.create_group('Geolocation Fields')
@@ -327,14 +398,29 @@ to store debugging information as well."""
             
             # Dataset: /HDFEOS/SWATHS/Swath2953/Data Fields/temperature
             dt = np.dtype('<f8')
-            dset = grp_4.create_dataset('temperature', (nx,ny), maxshape=(nx,ny), dtype=dt)
+            dset = grp_4.create_dataset(self.orig_name.split('/')[-1]+'_orig_and_krg', (nx,ny), maxshape=(nx,ny), dtype=dt)
             # initialize dataset values here
-            dset[:,:] = self.z2
-            
+            dset[:,:] = self.orig_and_krg
             # Creating attributes for /HDFEOS/SWATHS/Swath2953/Data Fields/temperature
-            dset.attrs['units'] = "K"
-            
+            dset.attrs['units'] = self.krg_units
             dset.attrs['coordinates'] = "latitude longitude"
+            dset.attrs['source_variable'] = self.orig_name
+
+            dset = grp_4.create_dataset(self.orig_name.split('/')[-1], (nx,ny), maxshape=(nx,ny), dtype=dt)
+            # initialize dataset values here
+            dset[:,:] = self.orig_z
+            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Data Fields/temperature
+            dset.attrs['units'] = self.orig_units
+            dset.attrs['coordinates'] = "latitude longitude"
+            dset.attrs['source_variable'] = self.orig_name
+            
+            dset = grp_4.create_dataset(self.krg_name.split('/')[-1], (nx,ny), maxshape=(nx,ny), dtype=dt)
+            # initialize dataset values here
+            dset[:,:] = self.krg
+            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Data Fields/temperature
+            dset.attrs['units'] = self.krg_units
+            dset.attrs['coordinates'] = "latitude longitude"
+            dset.attrs['source_variable'] = self.orig_name
             
             # Group: /HDFEOS INFORMATION
             grp_1 = f.create_group('HDFEOS INFORMATION')
@@ -344,25 +430,24 @@ to store debugging information as well."""
             dset = grp_1.create_dataset('StructMetadata.0', (), dtype=dt)
             # initialize dataset values here
             
-            
             # METADATA STRUCTURE
             
             # Close the file
             # f.close()
             
-            dset = f.create_dataset('metadata.json'\
-                                    ,data=json.dumps(\
-                                                     {"npts":self.npts\
-                                                      ,"log_calc":self.log_calc\
-                                                      ,"note":self.note\
-                                                      ,"vg_name":self.vg_name\
-                                                     }\
-                                                     ,sort_keys=True))
+            # dset = f.create_dataset('metadata.json'\
+            #                         ,data=json.dumps(\
+            #                                          {"npts":self.npts\
+            #                                           ,"log_calc":self.log_calc\
+            #                                           ,"note":self.note\
+            #                                           ,"vg_name":self.vg_name\
+            #                                          }\
+            #                                          ,sort_keys=True))
+            
             # dset = f.create_dataset(self.zVariableName,data=self.z)
             # dset = f.create_dataset(self.zVariableName+'_s',data=self.s)
             # dset = f.create_dataset('x',data=self.x)
             # dset = f.create_dataset('y',data=self.y)
-            
 
 
 ###########################################################################
@@ -380,205 +465,6 @@ def draw_screen_poly( lons, lats, m, facecolor='black', edgecolor='black' ):
                                   ))
 
 ###########################################################################
-
-#### mlr #### # /Users/mrilee/src/python/PyKrige-1.3.2.tar.gz
-#### mlr #### # core.variogram_function_error
-#### mlr #### def variogram_function_error(params, x, y, variogram_function, weight):
-#### mlr ####     """Function used to in fitting of variogram model.
-#### mlr ####     Returns RMSE between calculated fit and actual data."""
-#### mlr #### 
-#### mlr ####     diff = variogram_function(params, x) - y
-#### mlr #### 
-#### mlr ####     if weight:
-#### mlr ####         weights = np.arange(x.size, 0.0, -1.0)
-#### mlr ####         weights /= np.sum(weights)
-#### mlr ####         rmse = np.sqrt(np.average(diff**2, weights=weights))
-#### mlr ####     else:
-#### mlr ####         rmse = np.sqrt(np.mean(diff**2))
-#### mlr #### 
-#### mlr ####     return rmse
-#### mlr #### 
-#### mlr #### # /Users/mrilee/src/python/PyKrige-1.3.2.tar.gz
-#### mlr #### # core.calculate_variogram_model
-#### mlr #### 
-#### mlr #### def calculate_variogram_model(lags, semivariance, variogram_model, variogram_function, weight):
-#### mlr ####     """Function that fits a variogram model when parameters are not specified."""
-#### mlr #### 
-#### mlr ####     ## TODO Fix hardcoding
-#### mlr ####     # x0 = [2.6,0.2,0.75]
-#### mlr ####     x0 = [2.0,0.01,0.0001]
-#### mlr ####     
-#### mlr ####     ## PyKrige 1.3.2 core._variogram_function_error
-#### mlr ####     if False:
-#### mlr ####         bnds = ((0.0, 1000), (0.0, 10.0), (0.0, 10.0))
-#### mlr ####         res = minimize(variogram_function_error\
-#### mlr ####                        ,x0, args=(lags, semivariance, variogram_function, weight),\
-#### mlr ####                        method='SLSQP', bounds=bnds)
-#### mlr ####     
-#### mlr ####     ## PyKrige 1.4 now uses least_squares with a soft L1-norm to minimize outliers...
-#### mlr ####     if True:
-#### mlr ####         bnds = ([0.0,0.0,0.0], [1000,10,10])
-#### mlr ####         res = least_squares(core._variogram_residuals, x0, bounds=bnds, loss='soft_l1',\
-#### mlr ####                             args=(lags, semivariance, variogram_function, weight))
-#### mlr #### 
-#### mlr ####     return res.x
-#### mlr #### 
-#### mlr #### 
-#### mlr #### # PyKrige-1.4.0.tar.gz
-#### mlr #### # core._initialize_variogram_model
-#### mlr #### 
-#### mlr #### def initialize_variogram_model140(X, y, variogram_model,
-#### mlr ####                                   variogram_model_parameters, variogram_function,
-#### mlr ####                                   nlags, weight, coordinates_type='geographic'):
-#### mlr ####     """Initializes the variogram model for kriging. If user does not specify
-#### mlr ####     parameters, calls automatic variogram estimation routine.
-#### mlr ####     Returns lags, semivariance, and variogram model parameters.
-#### mlr #### 
-#### mlr ####     Parameters
-#### mlr ####     ----------
-#### mlr ####     X: ndarray
-#### mlr ####         float array [n_samples, n_dim], the input array of coordinates
-#### mlr ####     y: ndarray
-#### mlr ####         float array [n_samples], the input array of values to be kriged
-#### mlr ####     variogram_model: str
-#### mlr ####         user-specified variogram model to use
-#### mlr ####     variogram_model_parameters: list
-#### mlr ####         user-specified parameters for variogram model
-#### mlr ####     variogram_function: callable
-#### mlr ####         function that will be called to evaluate variogram model
-#### mlr ####         (only used if user does not specify variogram model parameters)
-#### mlr ####     nlags: int
-#### mlr ####         integer scalar, number of bins into which to group inter-point distances
-#### mlr ####     weight: bool
-#### mlr ####         boolean flag that indicates whether the semivariances at smaller lags
-#### mlr ####         should be weighted more heavily in the automatic variogram estimation
-#### mlr ####     coordinates_type: str
-#### mlr ####         type of coordinates in X array, can be 'euclidean' for standard
-#### mlr ####         rectangular coordinates or 'geographic' if the coordinates are lat/lon
-#### mlr #### 
-#### mlr ####     Returns
-#### mlr ####     -------
-#### mlr ####     lags: ndarray
-#### mlr ####         float array [nlags], distance values for bins into which the
-#### mlr ####         semivariances were grouped
-#### mlr ####     semivariance: ndarray
-#### mlr ####         float array [nlags], averaged semivariance for each bin
-#### mlr ####     variogram_model_parameters: list
-#### mlr ####         parameters for the variogram model, either returned unaffected if the
-#### mlr ####         user specified them or returned from the automatic variogram
-#### mlr ####         estimation routine
-#### mlr ####     """
-#### mlr #### 
-#### mlr ####     # distance calculation for rectangular coords now leverages
-#### mlr ####     # scipy.spatial.distance's pdist function, which gives pairwise distances
-#### mlr ####     # in a condensed distance vector (distance matrix flattened to a vector)
-#### mlr ####     # to calculate semivariances...
-#### mlr ####     if coordinates_type == 'euclidean':
-#### mlr ####         d = pdist(X, metric='euclidean')
-#### mlr ####         g = 0.5 * pdist(y[:, None], metric='sqeuclidean')
-#### mlr #### 
-#### mlr ####     # geographic coordinates only accepted if the problem is 2D
-#### mlr ####     # assume X[:, 0] ('x') => lon, X[:, 1] ('y') => lat
-#### mlr ####     # old method of distance calculation is retained here...
-#### mlr ####     # could be improved in the future
-#### mlr ####     elif coordinates_type == 'geographic':
-#### mlr ####         if X.shape[1] != 2:
-#### mlr ####             raise ValueError('Geographic coordinate type only '
-#### mlr ####                              'supported for 2D datasets.')
-#### mlr ####         x1, x2 = np.meshgrid(X[:, 0], X[:, 0], sparse=True)
-#### mlr ####         y1, y2 = np.meshgrid(X[:, 1], X[:, 1], sparse=True)
-#### mlr ####         z1, z2 = np.meshgrid(y, y, sparse=True)
-#### mlr ####         d = core.great_circle_distance(x1, y1, x2, y2)
-#### mlr ####         g = 0.5 * (z1 - z2)**2.
-#### mlr ####         indices = np.indices(d.shape)
-#### mlr ####         d = d[(indices[0, :, :] > indices[1, :, :])]
-#### mlr ####         g = g[(indices[0, :, :] > indices[1, :, :])]
-#### mlr #### 
-#### mlr ####     else:
-#### mlr ####         raise ValueError("Specified coordinate type '%s' "
-#### mlr ####                          "is not supported." % coordinates_type)
-#### mlr #### 
-#### mlr ####     # Equal-sized bins are now implemented. The upper limit on the bins
-#### mlr ####     # is appended to the list (instead of calculated as part of the
-#### mlr ####     # list comprehension) to avoid any numerical oddities
-#### mlr ####     # (specifically, say, ending up as 0.99999999999999 instead of 1.0).
-#### mlr ####     # Appending dmax + 0.001 ensures that the largest distance value
-#### mlr ####     # is included in the semivariogram calculation.
-#### mlr ####     dmax = np.amax(d)
-#### mlr ####     dmin = np.amin(d)
-#### mlr ####     dd = (dmax - dmin) / nlags
-#### mlr ####     bins = [dmin + n * dd for n in range(nlags)]
-#### mlr ####     dmax += 0.001
-#### mlr ####     bins.append(dmax)
-#### mlr #### 
-#### mlr ####     # This old binning method was experimental and doesn't seem
-#### mlr ####     # to work too well. Bins were computed such that there are more
-#### mlr ####     # at shorter lags. This effectively weights smaller distances more
-#### mlr ####     # highly in determining the variogram. As Kitanidis points out,
-#### mlr ####     # the variogram fit to the data at smaller lag distances is more
-#### mlr ####     # important. However, the value at the largest lag probably ends up
-#### mlr ####     # being biased too high for the larger values and thereby throws off
-#### mlr ####     # automatic variogram calculation and confuses comparison of the
-#### mlr ####     # semivariogram with the variogram model.
-#### mlr ####     #
-#### mlr ####     # dmax = np.amax(d)
-#### mlr ####     # dmin = np.amin(d)
-#### mlr ####     # dd = dmax - dmin
-#### mlr ####     # bins = [dd*(0.5**n) + dmin for n in range(nlags, 1, -1)]
-#### mlr ####     # bins.insert(0, dmin)
-#### mlr ####     # bins.append(dmax)
-#### mlr #### 
-#### mlr ####     lags = np.zeros(nlags)
-#### mlr ####     semivariance = np.zeros(nlags)
-#### mlr #### 
-#### mlr ####     for n in range(nlags):
-#### mlr ####         # This 'if... else...' statement ensures that there are data
-#### mlr ####         # in the bin so that numpy can actually find the mean. If we
-#### mlr ####         # don't test this first, then Python kicks out an annoying warning
-#### mlr ####         # message when there is an empty bin and we try to calculate the mean.
-#### mlr ####         if d[(d >= bins[n]) & (d < bins[n + 1])].size > 0:
-#### mlr ####             lags[n] = np.mean(d[(d >= bins[n]) & (d < bins[n + 1])])
-#### mlr ####             semivariance[n] = np.mean(g[(d >= bins[n]) & (d < bins[n + 1])])
-#### mlr ####         else:
-#### mlr ####             lags[n] = np.nan
-#### mlr ####             semivariance[n] = np.nan
-#### mlr #### 
-#### mlr ####     lags = lags[~np.isnan(semivariance)]
-#### mlr ####     semivariance = semivariance[~np.isnan(semivariance)]
-#### mlr #### 
-#### mlr ####     # We only use our custom model, and then calculate the parameters.
-#### mlr ####     
-#### mlr ####     # a few tests the make sure that, if the variogram_model_parameters
-#### mlr ####     # are supplied, they have been supplied as expected...
-#### mlr ####     # if variogram_model_parameters was not defined, then estimate the variogram
-#### mlr ####     if variogram_model_parameters is not None:
-#### mlr ####         if variogram_model == 'linear' and len(variogram_model_parameters) != 2:
-#### mlr ####             raise ValueError("Exactly two parameters required "
-#### mlr ####                              "for linear variogram model.")
-#### mlr ####         elif variogram_model in ['power', 'spherical', 'exponential',
-#### mlr ####                                  'gaussian', 'hole-effect'] \
-#### mlr ####                 and len(variogram_model_parameters) != 3:
-#### mlr ####             raise ValueError("Exactly three parameters required for "
-#### mlr ####                              "%s variogram model" % variogram_model)
-#### mlr ####         # Nothing to do! elif variogram_model == 'custom':
-#### mlr ####     else:
-#### mlr ####         # if variogram_model == 'custom':
-#### mlr ####         #     raise ValueError("Variogram parameters must be specified when "
-#### mlr ####         #                      "implementing custom variogram model.")
-#### mlr ####         # else:
-#### mlr ####         variogram_model_parameters = \
-#### mlr ####             calculate_variogram_model(lags, semivariance, variogram_model,
-#### mlr ####                                        variogram_function, weight)
-#### mlr #### 
-#### mlr ####     # # TODO HACK -- Refactor and do better... 
-#### mlr ####     # variogram_model_parameters = \
-#### mlr ####     #                              calculate_variogram_model(lags, semivariance, variogram_model,
-#### mlr ####     #                                                        variogram_function, weight)
-#### mlr #### 
-#### mlr ####     # 2018-0620-1252-45-EDT MLR The following does not work.
-#### mlr ####     #                             core._calculate_variogram_model(lags, semivariance, variogram_model,
-#### mlr #### 
-#### mlr ####     return lags, semivariance, variogram_model_parameters
 
 def fit_variogram(x,y,z
                   ,variogram_model
@@ -983,50 +869,49 @@ class Test_log10_map(unittest.TestCase):
         self.assertLess(np.sum((log10_map(np.arange(3),inverse=True)-[1,10,100])**2),eps**2)
         self.assertLess(np.sum((log10_map(np.power(10.0,np.arange(3)))-[0,1,2])**2),100.0*eps**2)
 
-class Test_krigeResult(unittest.TestCase):
-
-# Need to use a SWATH mode for the krigeResult
-    
-    def test_save(self):
-        output_filename = 'test.hdf5'
-        x,y = np.meshgrid(np.arange(-180,180),np.arange(-90,90))
-        x = x.reshape(180/4,360*4)
-        y = y.reshape(180/4,360*4)
-        z   = x**2 +y**2
-        x1 = np.ravel(x)
-        y1 = np.ravel(y)
-        z1 = np.ravel(z)
-        print 'x.shape:  ',x.shape
-        print 'y.shape:  ',y.shape
-        print 'z.shape:  ',z.shape
-        print 'x1.shape: ',x1.shape
-        print 'y1.shape: ',y1.shape
-        print 'z1.shape: ',z1.shape
-        kr=krigeResults(vg_name        = 'vg_name'\
-                        ,zVariableName = 'z1'\
-                        ,x             = x1\
-                        ,y             = y1\
-                        ,z             = z1\
-                        ,s             = -z1\
-                        ,x2            = x\
-                        ,y2            = y\
-                        ,z2            = z\
-                        ,s2            = -z
-                        )
-        kr.save(output_filename=output_filename)
-
-        # print 'kr.z: ',kr.z
-        
-        metadata = ''
-        with h5py.File(output_filename,'r') as f:
-            metadata = json.loads(f['metadata.json'][()])
-            self.assertEqual(metadata['vg_name']   ,kr.vg_name)
-            self.assertEqual(metadata['npts']      ,kr.npts)
-            self.assertEqual(metadata['log_calc']  ,kr.log_calc)
-            # z = f['z'][:]
-            # self.assertEqual(z[0],3.0)
-            # self.assertEqual(z[1],2.0)
-            # self.assertEqual(z[3],1.0)
+### delete #### class Test_krigeResult(unittest.TestCase):
+### delete #### # Need to use a SWATH mode for the krigeResult
+### delete ####     
+### delete ####     def test_save(self):
+### delete ####         output_filename = 'test.hdf5'
+### delete ####         x,y = np.meshgrid(np.arange(-180,180),np.arange(-90,90))
+### delete ####         x = x.reshape(180/4,360*4)
+### delete ####         y = y.reshape(180/4,360*4)
+### delete ####         z   = x**2 +y**2
+### delete ####         x1 = np.ravel(x)
+### delete ####         y1 = np.ravel(y)
+### delete ####         z1 = np.ravel(z)
+### delete ####         print 'x.shape:  ',x.shape
+### delete ####         print 'y.shape:  ',y.shape
+### delete ####         print 'z.shape:  ',z.shape
+### delete ####         print 'x1.shape: ',x1.shape
+### delete ####         print 'y1.shape: ',y1.shape
+### delete ####         print 'z1.shape: ',z1.shape
+### delete ####         kr=krigeResults(vg_name        = 'vg_name'\
+### delete ####                         ,zVariableName = 'z1'\
+### delete ####                         ,x             = x1\
+### delete ####                         ,y             = y1\
+### delete ####                         ,z             = z1\
+### delete ####                         ,s             = -z1\
+### delete ####                         ,x2            = x\
+### delete ####                         ,y2            = y\
+### delete ####                         ,z2            = z\
+### delete ####                         ,s2            = -z
+### delete ####                         )
+### delete ####         kr.save(output_filename=output_filename)
+### delete #### 
+### delete ####         # print 'kr.z: ',kr.z
+### delete ####         
+### delete ####         metadata = ''
+### delete ####         with h5py.File(output_filename,'r') as f:
+### delete ####             metadata = json.loads(f['metadata.json'][()])
+### delete ####             self.assertEqual(metadata['vg_name']   ,kr.vg_name)
+### delete ####             self.assertEqual(metadata['npts']      ,kr.npts)
+### delete ####             self.assertEqual(metadata['log_calc']  ,kr.log_calc)
+### delete ####             # z = f['z'][:]
+### delete ####             # self.assertEqual(z[0],3.0)
+### delete ####             # self.assertEqual(z[1],2.0)
+### delete ####             # self.assertEqual(z[3],1.0)
     
 ###########################################################################
 

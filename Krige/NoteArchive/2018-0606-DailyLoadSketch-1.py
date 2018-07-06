@@ -54,11 +54,13 @@ SRC_DIRECTORY_BASE=mdf.data_src_directory()
 ###########################################################################
 ##
 ##
-if False:
+if True:
     _datafield = 'Atmospheric_Water_Vapor_Mean'
     vmin=-2.0; vmax=1.25
     npts = 2000
     _variogram_model = 'gamma_rayleigh_nuggetless_variogram_model'
+    # _variogram_model = 'spherical_variogram_model'
+    # _drive_OKrige_plot_variogram      = True
     
     SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS-61/'
     #  MYD08_D3.A2015304.006.2015305223906.hdf
@@ -91,18 +93,17 @@ if False:
 ##
 ## Ozone Column # But wait, this isn't a MODIS object...
 ##
-if True:
+if False:
     _datafield = '/HDFEOS/GRIDS/OMI Column Amount O3/Data Fields/ColumnAmountO3'
     vmin=1.5; vmax=2.75
-    npts = 2000
-    # npts = 2000
+    npts = 4000
     # _variogram_model = 'linear_variogram_model'
     # _variogram_model = 'power_variogram_model'
     # _variogram_model = 'gaussian_variogram_model'
     _variogram_model = 'spherical_variogram_model'
     # _variogram_model = 'gamma_rayleigh_nuggetless_variogram_model'
     _drive_OKrige_plot_variogram      = True
-    _drive_OKrige_nlags               = 12
+    _drive_OKrige_nlags               = 6
     _drive_OKrige_log_calc            = True
     
     SRC_DIRECTORY=SRC_DIRECTORY_BASE+'OMI/'
@@ -183,7 +184,7 @@ inf_detected = False
 max_iter_start = 5
 max_iter = max_iter_start
 npts_in  = npts
-
+k=0
 while( True ):
     print 'npts_in( '+str(k)+' ) = '+str(npts_in)
     kr=0    
@@ -257,6 +258,29 @@ if True:
     print 'mnmx(kr.z):     ',np.nanmin(krige_results[-1].z)     ,np.nanmax(krige_results[-1].z)
     print 'mnmx(kr.dbg_z): ',np.nanmin(krige_results[-1].dbg_z) ,np.nanmax(krige_results[-1].dbg_z)
     print 'mnmx(kr.src_z): ',np.nanmin(krige_results[-1].src_z) ,np.nanmax(krige_results[-1].src_z)
+
+if True:
+    # Not correct: krige_results[-1].save()
+    variable_name   = krige_results[-1].zVariableName
+    output_filename = "DailyLoadSketch_"+modis_obj.datafilename+".hdf"
+    if '.hdf.hdf' in output_filename[-8:]:
+        output_filename = output_filename[:-4]
+        
+    kHDF = Krige.krigeHDF(\
+                          krg_name                 = variable_name+'_krg'\
+                          ,krg_units               = modis_obj.units\
+                          ,krg_z                   = krige_results[-1].z \
+                          ,krg_s                   = krige_results[-1].s \
+                          ,krg_x                   = krige_results[-1].x \
+                          ,krg_y                   = krige_results[-1].y \
+                          ,orig_name               = modis_obj.datafieldname\
+                          ,orig_units              = modis_obj.units\
+                          ,orig_z                  = modis_obj.data \
+                          ,orig_x                  = modis_obj.longitude \
+                          ,orig_y                  = modis_obj.latitude \
+                          ,output_filename         = output_filename\
+    )
+    kHDF.save()
 
 if _graph_results:
     print 'graphing...'
