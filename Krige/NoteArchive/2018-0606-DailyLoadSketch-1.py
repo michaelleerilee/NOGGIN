@@ -54,7 +54,7 @@ SRC_DIRECTORY_BASE=mdf.data_src_directory()
 ###########################################################################
 ##
 ##
-if True:
+if False:
     _datafield = 'Atmospheric_Water_Vapor_Mean'
     vmin=-2.0; vmax=1.25
     npts = 2000
@@ -93,7 +93,7 @@ if False:
 ##
 ## Ozone Column # But wait, this isn't a MODIS object...
 ##
-if False:
+if True:
     _datafield = '/HDFEOS/GRIDS/OMI Column Amount O3/Data Fields/ColumnAmountO3'
     vmin=1.5; vmax=2.75
     npts = 4000
@@ -290,9 +290,21 @@ if _graph_results:
                                                       ,vmap          = Krige.log10_map\
                                                       ,vmin          = vmin\
                                                       ,vmax          = vmax\
+                                                      ,kriged        = True\
+                                                      ,source_data   = True\
+                                                      ,kriged_data   = False\
+    )
+    execfile('2018-0519-KrigeSketchPlot-1.py')
+
+if False:
+    plot_configuration = Krige.krigePlotConfiguration(marker_size = 1.75\
+                                                      ,zVariableName = krigeSketch_results[0].zVariableName\
+                                                      ,title         = krigeSketch_results[0].title\
+                                                      ,vmap          = Krige.log10_map\
+                                                      ,vmin          = vmin\
+                                                      ,vmax          = vmax\
     )
     #                                                  ,title         = '.'.join(krigeSketch_results[0].title.split('.',3)[0:2])
-
     execfile('2018-0519-KrigeSketchPlot-1.py')
 
 end_time = time.time()

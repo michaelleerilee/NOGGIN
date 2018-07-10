@@ -534,60 +534,6 @@ for krigeBox in targetBoxes:
                                  
             krigeSketch_results.append(kr)
 
-            #krigeSketch_results.append(\
-            #                           Krige.drive_OKrige(\
-            #                                               grid_stride=dg\
-            #                                               ,random_permute=True\
-            #                                               ,x=gridx,y=gridy\
-            #                                               ,src_x=longitude1\
-            #                                               ,src_y=latitude1\
-            #                                               ,src_z=data1\
-            #                                               ,variogram_model='custom'\
-            #                                               ,variogram_parameters=custom_args\
-            #                                               ,variogram_function=custom_vg\
-            #                                               ,enable_plotting=_plot_variogram\
-            #                                               ,enable_statistics=_enable_statistics\
-            #                                               ,npts=npts\
-            #                                               ,beta0=beta0\
-            #                                               ,frac=0.0\
-            #                                               ,l=l,w=w\
-            #                                               ,weight=_drive_OKrige_weight\
-            #                                               ,verbose=_drive_OKrige_verbose\
-            #                                               ,eps=_drive_OKrige_eps\
-            #                                               ,backend=_drive_OKrige_backend\
-            #                           ))
-                                           
-            ## gridz, data_x, data_y, data_z\
-            ##     ,variogram_parameters = Krige.drive_OKrige(\
-            ##                                                 grid_stride=dg\
-            ##                                                 ,random_permute=True\
-            ##                                                 ,x=gridx,y=gridy\
-            ##                                                 ,src_x=longitude1\
-            ##                                                 ,src_y=latitude1\
-            ##                                                 ,src_z=data1\
-            ##                                                 ,variogram_model='custom'\
-            ##                                                 ,variogram_parameters=custom_args\
-            ##                                                 ,variogram_function=custom_vg\
-            ##                                                 ,enable_plotting=_plot_variogram\
-            ##                                                 ,enable_statistics=_enable_statistics\
-            ##                                                 ,npts=npts\
-            ##                                                 ,beta0=beta0\
-            ##                                                 ,frac=0.0\
-            ##                                                 ,l=l,w=w\
-            ##                                                 ,weight=_drive_OKrige_weight\
-            ##                                                 ,verbose=_drive_OKrige_verbose\
-            ##                                                 ,eps=_drive_OKrige_eps\
-            ##                                                 ,backend=_drive_OKrige_backend\
-            ## )
-            ## 
-            ## # krige_result = krigeResults(x=gridx,y=gridy,z=gridz,box=krigeBox)
-            ## # krigeSketch_results.append(krige_result)
-            ## krigeSketch_results.append(krigeResults(x=gridx,y=gridy,z=gridz,box=krigeBox,vg_parameters=variogram_parameters))
-            ## # xy1 = np.zeros((gridz.shape[0],2))
-            ## # xy1[:,0] = gridx
-            ## # xy1[:,1] = gridy
-            ## # grid_hull = ConvexHull(xy1)
-
             print 'k,mnmx(gridz): '+str(k)\
                 +', ( '+str(np.nanmin(krigeSketch_results[-1].z))\
                 +', '+str(np.nanmax(krigeSketch_results[-1].z))+' )'
