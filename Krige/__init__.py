@@ -1,3 +1,7 @@
+
+# import sys
+# print(sys.path)
+
 __author__  = 'ML Rilee'
 __version__ = '0.0.1'
 __doc__ = """
@@ -26,6 +30,13 @@ MODIS_DataField: Load and visualization functions for a MODIS datafield.
 
 """
 
-__all__ = ["Krige","MODIS_DataField"]
+from . import core
+# from Krige import span_array
+# from Krige import drive_OKrige
+# from Krige import krigePlotConfiguration
+# from Krige import krigeHDF
+from core import *
+
+__all__ = ["core","MODIS_DataField"]
 
 

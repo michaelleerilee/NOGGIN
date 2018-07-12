@@ -12,7 +12,7 @@ import sys
 from time import gmtime, strftime
 
 import Krige
-import MODIS_DataField as mdf
+import Krige.MODIS_DataField as mdf
 
 # from MODIS_DataField import MODIS_DataField, BoundingBox, mdf.Point, box_covering, Polygon, data_src_directory
 

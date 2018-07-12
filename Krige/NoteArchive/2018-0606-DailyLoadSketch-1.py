@@ -14,7 +14,8 @@ import sys
 from time import gmtime, strftime
 
 import Krige
-import MODIS_DataField as mdf
+import Krige.MODIS_DataField as mdf
+
 
 import pykrige
 import pykrige.variogram_models as vm
@@ -50,11 +51,19 @@ _drive_OKrige_log_calc            = True
 ##
 
 SRC_DIRECTORY_BASE=mdf.data_src_directory()
-    
+
 ###########################################################################
 ##
 ##
-if False:
+
+# _DailyLoad_Case = 'MODIS-Water_Vapor_Mean-Case-1'
+# _DailyLoad_Case = 'MODIS-Total_Ozone_Burden-Case-1'
+_DailyLoad_Case = 'OMI-Total_Ozone-Case-1'
+
+###########################################################################
+##
+##
+if _DailyLoad_Case == 'MODIS-Water_Vapor_Mean-Case-1':
     _datafield = 'Atmospheric_Water_Vapor_Mean'
     vmin=-2.0; vmax=1.25
     npts = 2000
@@ -73,7 +82,7 @@ if False:
 ###########################################################################
 ##
 ## Ozone Burden
-if False:
+if _DailyLoad_Case == 'MODIS-Total_Ozone_Burden-Case-1':
     _datafield = 'Total_Ozone_Mean'
     vmin=1.5; vmax=2.75
     npts = 2000
@@ -93,7 +102,7 @@ if False:
 ##
 ## Ozone Column # But wait, this isn't a MODIS object...
 ##
-if True:
+if _DailyLoad_Case == 'OMI-Total_Ozone-Case-1':
     _datafield = '/HDFEOS/GRIDS/OMI Column Amount O3/Data Fields/ColumnAmountO3'
     vmin=1.5; vmax=2.75
     npts = 4000
@@ -103,11 +112,15 @@ if True:
     _variogram_model = 'spherical_variogram_model'
     # _variogram_model = 'gamma_rayleigh_nuggetless_variogram_model'
     _drive_OKrige_plot_variogram      = True
-    _drive_OKrige_nlags               = 6
+    _drive_OKrige_nlags               = 8
     _drive_OKrige_log_calc            = True
     
     SRC_DIRECTORY=SRC_DIRECTORY_BASE+'OMI/'
-    i = "OMI-Aura_L3-OMTO3d_2015m1015_v003-2015m1017t024934.he5"
+    # i = "OMI-Aura_L3-OMTO3d_2015m1012_v003-2015m1014t023506.he5"
+    i = "OMI-Aura_L3-OMTO3d_2015m1013_v003-2015m1015t013733.he5"
+    # i = "OMI-Aura_L3-OMTO3d_2015m1014_v003-2015m1016t021656.he5"
+    # i = "OMI-Aura_L3-OMTO3d_2015m1015_v003-2015m1017t024934.he5"
+
 
 ###########################################################################
 
@@ -158,6 +171,7 @@ data_mx_in_grid = np.nanmax(data1)
 krigeBox = mdf.BoundingBox((mdf.Point((np.nanmin(gridx),np.nanmin(gridy)))\
                             ,mdf.Point((np.nanmax(gridx),np.nanmin(gridy)))))
                             
+# dx = span_array(gridx)
 dx = Krige.span_array(gridx)
 dy = Krige.span_array(gridy)
 dr = math.sqrt(dx*dx+dy*dy)
@@ -292,7 +306,7 @@ if _graph_results:
                                                       ,vmax          = vmax\
                                                       ,kriged        = True\
                                                       ,source_data   = True\
-                                                      ,kriged_data   = False\
+                                                      ,kriged_data   = True\
     )
     execfile('2018-0519-KrigeSketchPlot-1.py')
 

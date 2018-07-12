@@ -6,6 +6,8 @@ Kriging support functions for NOGGIN.
 ML Rilee, RSTLLC, mike@rilee.net for NASA/ACCESS-15/NOGGIN.
 
 """
+import Krige
+
 import os
 import sys
 import matplotlib as mpl
@@ -28,6 +30,11 @@ import h5py
 import json
 
 import unittest
+
+###########################################################################
+
+def get_version():
+    return Krige.__version__
 
 ###########################################################################
 
@@ -330,8 +337,10 @@ The shape of the orig_? arrays is used to format the datasets written to output 
 
         orig_and_krg = np.zeros(self.orig_x.shape)
         krg = np.zeros(self.orig_x.shape)
+        s = np.zeros(self.orig_x.shape)
         orig_and_krg[:,:] = self.orig_z
         krg[:,:] = np.nan
+        s[:,:] = np.nan
 
         for i in range(len(self.krg_x)):
             x = self.krg_x[i]
@@ -340,12 +349,14 @@ The shape of the orig_? arrays is used to format the datasets written to output 
             # If len(idx) != 2 error.
             orig_and_krg[idx[0],idx[1]] = self.krg_z[i]
             krg[idx[0],idx[1]] = self.krg_z[i]
+            s  [idx[0],idx[1]] = self.krg_s[i]
             
         self.x2 = self.orig_x
         self.y2 = self.orig_y
         self.z2 = orig_and_krg
         self.orig_and_krg = orig_and_krg
         self.krg = krg
+        self.s   = s
         
     def save(self):
         """Save the krige, source, and krige+source data to a file. Should figure out a way to control the format of the file and provide information about the 'grid.' This is necessary if we want the krige output to be compatible with NOGGIn regridding."""
@@ -356,52 +367,60 @@ The shape of the orig_? arrays is used to format the datasets written to output 
             # Group: /HDFEOS
             grp_1 = f.create_group('HDFEOS')
             
-            # Group: /HDFEOS/SWATHS
+            # Group: /HDFEOS/NOGGIN
             grp_2 = grp_1.create_group('NOGGIN')
             
-            # Group: /HDFEOS/SWATHS/Swath2953
+            # Group: /HDFEOS/NOGGIN/KrigeResult1
             grp_3 = grp_2.create_group('KrigeResult1')
-            
+
+            grp_4 = grp_3.create_group('KrigeCalculationConfiguration')
+            dset = grp_4.create_dataset('configuration.json'\
+                                        ,data=json.dumps(\
+                                                         {\
+                                                          'noggin_krige_version0': get_version()
+                                                          ,'noggin_krige_version1': Krige.__version__
+                                                          }\
+                                        ))
             # Group: /HDFEOS/SWATHS/Swath2953/Geolocation Fields
             grp_4 = grp_3.create_group('Geolocation Fields')
 
 # TODO need to go back to some sort of 2D array.
-            # Dataset: /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Latitude
+            # Dataset: /HDFEOS/NOGGIN/KrigeResult1/Geolocation Fields/Latitude
             dt = np.dtype('<f8')
             dset = grp_4.create_dataset('Latitude', (nx,ny), maxshape=(nx,ny), dtype=dt)
             # initialize dataset values here
             dset[:,:] = self.y2
             
-            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Latitude
+            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Geolocation Fields/Latitude
             dset.attrs['units'] = "degrees_north"
             
-            # Dataset: /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Longitude
+            # Dataset: /HDFEOS/NOGGIN/KrigeResult1/Geolocation Fields/Longitude
             dt = np.dtype('<f8')
             dset = grp_4.create_dataset('Longitude', (nx,ny), maxshape=(nx,ny), dtype=dt)
             # initialize dataset values here
             dset[:,:] = self.x2
             
-            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Longitude
+            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Geolocation Fields/Longitude
             dset.attrs['units'] = "degrees_east"
             
-            # Dataset: /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Time
+            # Dataset: /HDFEOS/NOGGIN/KrigeResult1/Geolocation Fields/Time
             dt = np.dtype('<f8')
             dset = grp_4.create_dataset('Time', (1,), maxshape=(1,), dtype=dt)
             # initialize dataset values here
             dset[:] = 0.0
                         
-            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Geolocation Fields/Time
+            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Geolocation Fields/Time
             dset.attrs['units'] = "seconds since 1993-01-01 00:00:00.000000Z"
             
-            # Group: /HDFEOS/SWATHS/Swath2953/Data Fields
+            # Group: /HDFEOS/NOGGIN/KrigeResult1/Data Fields
             grp_4 = grp_3.create_group('Data Fields')
             
-            # Dataset: /HDFEOS/SWATHS/Swath2953/Data Fields/temperature
+            # Dataset: /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
             dt = np.dtype('<f8')
             dset = grp_4.create_dataset(self.orig_name.split('/')[-1]+'_orig_and_krg', (nx,ny), maxshape=(nx,ny), dtype=dt)
             # initialize dataset values here
             dset[:,:] = self.orig_and_krg
-            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Data Fields/temperature
+            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
             dset.attrs['units'] = self.krg_units
             dset.attrs['coordinates'] = "latitude longitude"
             dset.attrs['source_variable'] = self.orig_name
@@ -409,7 +428,7 @@ The shape of the orig_? arrays is used to format the datasets written to output 
             dset = grp_4.create_dataset(self.orig_name.split('/')[-1], (nx,ny), maxshape=(nx,ny), dtype=dt)
             # initialize dataset values here
             dset[:,:] = self.orig_z
-            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Data Fields/temperature
+            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
             dset.attrs['units'] = self.orig_units
             dset.attrs['coordinates'] = "latitude longitude"
             dset.attrs['source_variable'] = self.orig_name
@@ -417,8 +436,27 @@ The shape of the orig_? arrays is used to format the datasets written to output 
             dset = grp_4.create_dataset(self.krg_name.split('/')[-1], (nx,ny), maxshape=(nx,ny), dtype=dt)
             # initialize dataset values here
             dset[:,:] = self.krg
-            # Creating attributes for /HDFEOS/SWATHS/Swath2953/Data Fields/temperature
+            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
             dset.attrs['units'] = self.krg_units
+            dset.attrs['coordinates'] = "latitude longitude"
+            dset.attrs['source_variable'] = self.orig_name
+
+            dset = grp_4.create_dataset(self.krg_name.split('/')[-1]+"_uncertainty", (nx,ny), maxshape=(nx,ny), dtype=dt)
+            # initialize dataset values here
+            dset[:,:] = np.sqrt(self.s)
+            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
+            dset.attrs['units'] = self.krg_units
+            dset.attrs['coordinates'] = "latitude longitude"
+            dset.attrs['source_variable'] = self.orig_name
+
+            dset = grp_4.create_dataset(self.krg_name.split('/')[-1]+"_relative_uncertainty", (nx,ny), maxshape=(nx,ny), dtype=dt)
+            # initialize dataset values here
+            tmp = np.zeros(self.s.shape)
+            tmp[:,:] = np.sqrt(self.s)/self.krg
+            tmp[np.where(tmp == np.inf)] = np.nan
+            dset[:,:] = tmp 
+            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
+            dset.attrs['units'] = 'dimensionless'
             dset.attrs['coordinates'] = "latitude longitude"
             dset.attrs['source_variable'] = self.orig_name
             
@@ -551,6 +589,13 @@ def fit_variogram(x,y,z
 
 
 # lags,semivar,parms = initialize_variogram_model(data_x1,data_y,data_z1,'custom',custom_args,custom_vg,nlags=12,weight=False)
+
+###########################################################################
+
+# class 
+
+
+
 
 ###########################################################################
 
@@ -927,6 +972,8 @@ def data_src_directory():
     
 
 if __name__ == '__main__':
+    print '0 Krige.py version: ',get_version()
+    print '1 Krige.py version: ',Krige.__version__
     if False:
         fig_gen = fig_generator(1,1)
         fig_gen.increment_figure()
