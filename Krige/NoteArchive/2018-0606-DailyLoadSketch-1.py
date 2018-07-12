@@ -56,9 +56,9 @@ SRC_DIRECTORY_BASE=mdf.data_src_directory()
 ##
 ##
 
-# _DailyLoad_Case = 'MODIS-Water_Vapor_Mean-Case-1'
+_DailyLoad_Case = 'MODIS-Water_Vapor_Mean-Case-1'
 # _DailyLoad_Case = 'MODIS-Total_Ozone_Burden-Case-1'
-_DailyLoad_Case = 'OMI-Total_Ozone-Case-1'
+# _DailyLoad_Case = 'OMI-Total_Ozone-Case-1'
 
 ###########################################################################
 ##
@@ -112,7 +112,7 @@ if _DailyLoad_Case == 'OMI-Total_Ozone-Case-1':
     _variogram_model = 'spherical_variogram_model'
     # _variogram_model = 'gamma_rayleigh_nuggetless_variogram_model'
     _drive_OKrige_plot_variogram      = True
-    _drive_OKrige_nlags               = 8
+    _drive_OKrige_nlags               = 6
     _drive_OKrige_log_calc            = True
     
     SRC_DIRECTORY=SRC_DIRECTORY_BASE+'OMI/'
@@ -228,9 +228,12 @@ while( True ):
                            ,backend            = _drive_OKrige_backend\
         )
     kr_mx = np.nanmax(kr.z)
+    kr_s_mn = np.nanmin(kr.s)
+    kr_s_mx = np.nanmax(kr.s)
     max_iter = max_iter - 1
     print 'kr_mx,data_mx_in_grid: ',kr_mx,data_mx_in_grid
-    if (max_iter < 1) or (kr_mx < divergence_threshold * data_mx_in_grid):
+    print 'kr_s_mnmx:             ',kr_s_mn,kr_s_mx
+    if (max_iter < 1) or ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
         if (max_iter < 1):
             print '**'
             print '*** kriging diverged, max_iter exceeded, continuing to next tile'
@@ -272,6 +275,7 @@ if True:
     print 'mnmx(kr.z):     ',np.nanmin(krige_results[-1].z)     ,np.nanmax(krige_results[-1].z)
     print 'mnmx(kr.dbg_z): ',np.nanmin(krige_results[-1].dbg_z) ,np.nanmax(krige_results[-1].dbg_z)
     print 'mnmx(kr.src_z): ',np.nanmin(krige_results[-1].src_z) ,np.nanmax(krige_results[-1].src_z)
+    print 'mnmx(kr.s):     ',np.nanmin(krige_results[-1].s)     ,np.nanmax(krige_results[-1].s)
 
 if True:
     # Not correct: krige_results[-1].save()
@@ -283,6 +287,7 @@ if True:
     kHDF = Krige.krigeHDF(\
                           krg_name                 = variable_name+'_krg'\
                           ,krg_units               = modis_obj.units\
+                          ,config                  = krige_results[-1].config\
                           ,krg_z                   = krige_results[-1].z \
                           ,krg_s                   = krige_results[-1].s \
                           ,krg_x                   = krige_results[-1].x \

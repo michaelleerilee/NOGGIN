@@ -18,6 +18,7 @@ from mpl_toolkits.basemap import Basemap
 from pyhdf.SD import SD, SDC
 from math import *
 
+import pykrige
 from pykrige.ok import OrdinaryKriging
 import pykrige.kriging_tools as kt
 import pykrige.core as core
@@ -30,11 +31,6 @@ import h5py
 import json
 
 import unittest
-
-###########################################################################
-
-def get_version():
-    return Krige.__version__
 
 ###########################################################################
 
@@ -176,8 +172,10 @@ to store debugging information as well."""
                  ,npts=None\
                  ,log_calc=None\
                  ,note='Default note for krigeResults'\
+                 ,config=None\
     ):
         self.clear()
+        self.config = config
         if x is not None:
             self.x=x.copy()
         if y is not None:
@@ -267,19 +265,20 @@ to store debugging information as well."""
         self.sort_on_longitude_dbg_xyz()
         # else fail silently
     def clear(self):
-        self.x     = None
-        self.y     = None
-        self.z     = None
-        self.s     = None
-        self.src_x = None
-        self.src_y = None
-        self.src_z = None
-        self.dbg_x = None
-        self.dbg_y = None
-        self.dbg_z = None
-        self.hull  = None
-        self.box   = None
-        self.note  = 'Default note for krigeResults'
+        self.config = None
+        self.x      = None
+        self.y      = None
+        self.z      = None
+        self.s      = None
+        self.src_x  = None
+        self.src_y  = None
+        self.src_z  = None
+        self.dbg_x  = None
+        self.dbg_y  = None
+        self.dbg_z  = None
+        self.hull   = None
+        self.box    = None
+        self.note   = 'Default note for krigeResults'
     def construct_hull(self):
         """Construct the hull from z,x,y. z is used to get the shape of the data, 
         so it could be replaced using x and y alone."""
@@ -305,7 +304,7 @@ class krigeHDF(object):
                  ,src_units='kr_units'\
                  ,orig_units='kr_units'\
                  ,output_filename ='krigeHDF-test.hdf'\
-                 ,n_across = 180\
+                 ,config = None\
                  ):
         """Support saving krige results in an HDF (EOS) compatible way, so that tools like Panoply might be used.
 
@@ -334,6 +333,7 @@ The shape of the orig_? arrays is used to format the datasets written to output 
         self.orig_name       = orig_name
         self.orig_units      = orig_units
         self.output_filename = output_filename
+        self.config          = config
 
         orig_and_krg = np.zeros(self.orig_x.shape)
         krg = np.zeros(self.orig_x.shape)
@@ -373,15 +373,14 @@ The shape of the orig_? arrays is used to format the datasets written to output 
             # Group: /HDFEOS/NOGGIN/KrigeResult1
             grp_3 = grp_2.create_group('KrigeResult1')
 
-            grp_4 = grp_3.create_group('KrigeCalculationConfiguration')
-            dset = grp_4.create_dataset('configuration.json'\
-                                        ,data=json.dumps(\
-                                                         {\
-                                                          'noggin_krige_version0': get_version()
-                                                          ,'noggin_krige_version1': Krige.__version__
-                                                          }\
-                                        ))
-            # Group: /HDFEOS/SWATHS/Swath2953/Geolocation Fields
+            if self.config is not None:
+                grp_4 = grp_3.create_group('KrigeCalculationConfiguration')
+                # TODO: Encapsulate this logic in a configuration object.
+                dset = grp_4.create_dataset('configuration.json',data=self.config.as_json())
+                dset.attrs['json'] = self.config.as_json()
+            
+            # Group: /HDFEOS/SWATHS/Swath2953/Geolocation Fields (HPD original)
+            # Group: /HDFEOS/NOGGIN/KrigeResult1/Geolocation Fields
             grp_4 = grp_3.create_group('Geolocation Fields')
 
 # TODO need to go back to some sort of 2D array.
@@ -592,12 +591,70 @@ def fit_variogram(x,y,z
 
 ###########################################################################
 
-# class 
-
-
+class krigeConfig(object):
+    def __init__(self\
+                 ,npts                 = None\
+                 ,beta0                = None\
+                 ,frac                 = None\
+                 ,l                    = None\
+                 ,w                    = None\
+                 ,model_name           = None\
+                 ,nlags                = None\
+                 ,weight               = None\
+                 ,parameters           = None\
+                 ,grid_stride          = None\
+                 ,random_permute       = None\
+                 ,coordinates_type     = None\
+    ):
+        self.noggin_krige_version = Krige.__version__
+        self.pykrige_version      = pykrige.__version__
+        self.npts                 = npts
+        self.beta0                = beta0
+        self.frac                 = frac
+        self.l                    = l
+        self.w                    = w
+        self.model_name           = model_name
+        self.nlags                = nlags
+        self.weight               = weight
+        self.parameters           = parameters
+        self.grid_stride          = grid_stride
+        self.random_permute       = random_permute
+        self.coordinates_type     = coordinates_type
+    def as_dict(self):
+        return \
+            {\
+             'noggin_krige_version': self.noggin_krige_version\
+             ,'pykrige_version'    : self.pykrige_version\
+             ,'coordinates_type'   : self.coordinates_type\
+             ,'adaptive_sampling'  : \
+             {\
+              'npts'   : self.npts\
+              ,'beta0' : self.beta0\
+              ,'frac'  : self.frac\
+              ,'l'     : self.l\
+              ,'w'     : self.w\
+             }\
+             ,'variogram':\
+             {\
+              'model_name' : self.model_name\
+              ,'nlags'     : self.nlags\
+              ,'weight'    : self.weight\
+              ,'parameters': self.parameters\
+             }\
+             ,'calculation':\
+             {\
+              'grid_stride'     : self.grid_stride\
+              ,'random_permute' : self.random_permute\
+              }}
+    def as_json(self):
+        return json.dumps(self.as_dict())
+    # TODO def from_json(self)...
 
 
 ###########################################################################
+
+# TODO Add option to turn off adaptive sampling. Notes this would affect
+# TODO the bounding box (l,w) that limits the data used.
 
 def drive_OKrige(
         x,y
@@ -737,6 +794,21 @@ and the data_ and the variogram_parameters of the last sub-calculation.
 	        gridz [isample] = z[:]
 	    gridss[isample] = ss[:]
     # TODO Need to return gridss
+    print 1000
+    config = krigeConfig(\
+                         npts                  = npts\
+                         ,beta0                = beta0\
+                         ,frac                 = frac\
+                         ,l                    = l\
+                         ,w                    = w\
+                         ,model_name           = variogram_model\
+                         ,nlags                = nlags\
+                         ,weight               = weight\
+                         ,parameters           = variogram_parameters\
+                         ,grid_stride          = grid_stride\
+                         ,random_permute       = random_permute\
+                         ,coordinates_type     = 'geographic'\
+    )
     return krigeResults(s              = gridss\
                         ,z             = gridz\
                         ,x             = x\
@@ -745,7 +817,9 @@ and the data_ and the variogram_parameters of the last sub-calculation.
                         ,src_x         = data_x\
                         ,src_y         = data_y\
                         ,vg_function   = variogram_function\
-                        ,vg_parameters = variogram_parameters)
+                        ,vg_parameters = variogram_parameters\
+                        ,config        = config\
+                        )
     # return gridz, data_x, data_y, data_z, variogram_parameters
     
 ####
@@ -914,6 +988,39 @@ class Test_log10_map(unittest.TestCase):
         self.assertLess(np.sum((log10_map(np.arange(3),inverse=True)-[1,10,100])**2),eps**2)
         self.assertLess(np.sum((log10_map(np.power(10.0,np.arange(3)))-[0,1,2])**2),100.0*eps**2)
 
+
+class Test_krigeConfig(unittest.TestCase):
+    def test_json(self):
+        i = 0
+        npts                 = i; i = i+1
+        beta0                = i; i = i+1
+        frac                 = i; i = i+1
+        l                    = i; i = i+1
+        w                    = i; i = i+1
+        model_name           = i; i = i+1
+        nlags                = i; i = i+1
+        weight               = i; i = i+1
+        parameters           = i; i = i+1
+        grid_stride          = i; i = i+1
+        random_permute       = i; i = i+1
+        
+        config = krigeConfig(\
+                             npts                  = npts\
+                             ,beta0                = beta0\
+                             ,frac                 = frac\
+                             ,l                    = l\
+                             ,w                    = w\
+                             ,model_name           = model_name\
+                             ,nlags                = nlags\
+                             ,weight               = weight\
+                             ,parameters           = parameters\
+                             ,grid_stride          = grid_stride\
+                             ,random_permute       = random_permute\
+                             ,coordinates_type     ='geographic'\
+        )
+        self.assertEqual(config.as_json()\
+                         ,'{"variogram": {"parameters": 8, "nlags": 6, "model_name": 5, "weight": 7}, "calculation": {"grid_stride": 9, "random_permute": 10}, "pykrige_version": "1.4.0.NOGGIn.0", "noggin_krige_version": "0.0.1", "adaptive_sampling": {"npts": 0, "frac": 2, "l": 3, "w": 4, "beta0": 1}, "coordinates_type": "geographic"}')
+        
 ### delete #### class Test_krigeResult(unittest.TestCase):
 ### delete #### # Need to use a SWATH mode for the krigeResult
 ### delete ####     
@@ -972,8 +1079,9 @@ def data_src_directory():
     
 
 if __name__ == '__main__':
-    print '0 Krige.py version: ',get_version()
-    print '1 Krige.py version: ',Krige.__version__
+    print
+    print 'Krige version:   ',Krige.__version__
+    print 'PyKrige version: ',pykrige.__version__
     if False:
         fig_gen = fig_generator(1,1)
         fig_gen.increment_figure()

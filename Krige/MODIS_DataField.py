@@ -471,9 +471,9 @@ custom_loader=None.  A callable(self) that allows a user to write a
         ua           = attrs[self.key_units]
         self.units        = ua[0]
 
+        # This sequence follows https://hdfeos.org/zoo/LAADS/MOD05_L2.A2010001.0000.006.2015041171924.hdf.py
         invalid = np.logical_or(data > valid_max, data < valid_min)
         invalid = np.logical_or(invalid,data == _FillValue)
-        
         data[invalid] = np.nan
         data = (data - add_offset) * scale_factor
         self.data = np.ma.masked_array(data, np.isnan(data))
