@@ -305,6 +305,7 @@ class krigeHDF(object):
                  ,orig_units='kr_units'\
                  ,output_filename ='krigeHDF-test.hdf'\
                  ,config = None\
+                 ,redimension = True\
                  ):
         """Support saving krige results in an HDF (EOS) compatible way, so that tools like Panoply might be used.
 
@@ -335,22 +336,44 @@ The shape of the orig_? arrays is used to format the datasets written to output 
         self.output_filename = output_filename
         self.config          = config
 
-        orig_and_krg = np.zeros(self.orig_x.shape)
-        krg = np.zeros(self.orig_x.shape)
-        s = np.zeros(self.orig_x.shape)
-        orig_and_krg[:,:] = self.orig_z
-        krg[:,:] = np.nan
-        s[:,:] = np.nan
+        if (self.orig_z is None):
+            #  or (self.krg_z is None):
+            orig_and_krg = None
+        else:
+            orig_and_krg = np.zeros(self.orig_x.shape)
+        if self.krg_z is not None:
+            krg = np.zeros(self.orig_x.shape)
+            krg[:,:] = np.nan
+        else:
+            krg = None
+        if self.krg_s is not None:
+            s = np.zeros(self.orig_x.shape)
+            s[:,:] = np.nan
+        else:
+            s = None
+        if self.orig_z is not None:
+            orig_and_krg[:,:] = self.orig_z
 
-        for i in range(len(self.krg_x)):
-            x = self.krg_x[i]
-            y = self.krg_y[i]
-            idx = np.where( (self.orig_x == x) & (self.orig_y == y) )
-            # If len(idx) != 2 error.
-            orig_and_krg[idx[0],idx[1]] = self.krg_z[i]
-            krg[idx[0],idx[1]] = self.krg_z[i]
-            s  [idx[0],idx[1]] = self.krg_s[i]
-            
+        if redimension:
+            if (self.krg_x is not None) and (self.orig_x is not None):
+                for i in range(len(self.krg_x)):
+                    x = self.krg_x[i]
+                    y = self.krg_y[i]
+                    idx = np.where( (self.orig_x == x) & (self.orig_y == y) )
+                    # If len(idx) != 2 error.
+                    orig_and_krg[idx[0],idx[1]] = self.krg_z[i]
+                    krg[idx[0],idx[1]] = self.krg_z[i]
+                    s  [idx[0],idx[1]] = self.krg_s[i]
+        else:
+            x = self.krg_x
+            y = self.krg_y
+            idx = np.where( orig_and_krg == np.nan )
+            # TODO check to see if krg_z and orig_z have the same shape
+            orig_and_krg[idx] = self.krg_z[idx]
+            krg = self.krg_z
+            s   = self.krg_s
+                
+                    
         self.x2 = self.orig_x
         self.y2 = self.orig_y
         self.z2 = orig_and_krg
@@ -409,55 +432,61 @@ The shape of the orig_? arrays is used to format the datasets written to output 
             dset[:] = 0.0
                         
             # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Geolocation Fields/Time
+            # TODO This is probably incorrect
             dset.attrs['units'] = "seconds since 1993-01-01 00:00:00.000000Z"
             
             # Group: /HDFEOS/NOGGIN/KrigeResult1/Data Fields
             grp_4 = grp_3.create_group('Data Fields')
-            
-            # Dataset: /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
-            dt = np.dtype('<f8')
-            dset = grp_4.create_dataset(self.orig_name.split('/')[-1]+'_orig_and_krg', (nx,ny), maxshape=(nx,ny), dtype=dt)
-            # initialize dataset values here
-            dset[:,:] = self.orig_and_krg
-            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
-            dset.attrs['units'] = self.krg_units
-            dset.attrs['coordinates'] = "latitude longitude"
-            dset.attrs['source_variable'] = self.orig_name
 
-            dset = grp_4.create_dataset(self.orig_name.split('/')[-1], (nx,ny), maxshape=(nx,ny), dtype=dt)
-            # initialize dataset values here
-            dset[:,:] = self.orig_z
-            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
-            dset.attrs['units'] = self.orig_units
-            dset.attrs['coordinates'] = "latitude longitude"
-            dset.attrs['source_variable'] = self.orig_name
-            
-            dset = grp_4.create_dataset(self.krg_name.split('/')[-1], (nx,ny), maxshape=(nx,ny), dtype=dt)
-            # initialize dataset values here
-            dset[:,:] = self.krg
-            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
-            dset.attrs['units'] = self.krg_units
-            dset.attrs['coordinates'] = "latitude longitude"
-            dset.attrs['source_variable'] = self.orig_name
+            if self.orig_and_krg is not None:
+                # Dataset: /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
+                dt = np.dtype('<f8')
+                dset = grp_4.create_dataset(self.orig_name.split('/')[-1]+'_orig_and_krg', (nx,ny), maxshape=(nx,ny), dtype=dt)
+                # initialize dataset values here
+                dset[:,:] = self.orig_and_krg
+                # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
+                dset.attrs['units'] = self.krg_units
+                dset.attrs['coordinates'] = "latitude longitude"
+                dset.attrs['source_variable'] = self.orig_name
 
-            dset = grp_4.create_dataset(self.krg_name.split('/')[-1]+"_uncertainty", (nx,ny), maxshape=(nx,ny), dtype=dt)
-            # initialize dataset values here
-            dset[:,:] = np.sqrt(self.s)
-            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
-            dset.attrs['units'] = self.krg_units
-            dset.attrs['coordinates'] = "latitude longitude"
-            dset.attrs['source_variable'] = self.orig_name
+            if self.orig_z is not None:
+                dset = grp_4.create_dataset(self.orig_name.split('/')[-1], (nx,ny), maxshape=(nx,ny), dtype=dt)
+                # initialize dataset values here
+                dset[:,:] = self.orig_z
+                # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
+                dset.attrs['units'] = self.orig_units
+                dset.attrs['coordinates'] = "latitude longitude"
+                dset.attrs['source_variable'] = self.orig_name
 
-            dset = grp_4.create_dataset(self.krg_name.split('/')[-1]+"_relative_uncertainty", (nx,ny), maxshape=(nx,ny), dtype=dt)
-            # initialize dataset values here
-            tmp = np.zeros(self.s.shape)
-            tmp[:,:] = np.sqrt(self.s)/self.krg
-            tmp[np.where(tmp == np.inf)] = np.nan
-            dset[:,:] = tmp 
-            # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
-            dset.attrs['units'] = 'dimensionless'
-            dset.attrs['coordinates'] = "latitude longitude"
-            dset.attrs['source_variable'] = self.orig_name
+            if self.krg is not None:
+                dset = grp_4.create_dataset(self.krg_name.split('/')[-1], (nx,ny), maxshape=(nx,ny), dtype=dt)
+                # initialize dataset values here
+                dset[:,:] = self.krg
+                # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
+                dset.attrs['units'] = self.krg_units
+                dset.attrs['coordinates'] = "latitude longitude"
+                dset.attrs['source_variable'] = self.orig_name
+
+            if self.s is not None:
+                dset = grp_4.create_dataset(self.krg_name.split('/')[-1]+"_uncertainty", (nx,ny), maxshape=(nx,ny), dtype=dt)
+                # initialize dataset values here
+                dset[:,:] = np.sqrt(self.s)
+                # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
+                dset.attrs['units'] = self.krg_units
+                dset.attrs['coordinates'] = "latitude longitude"
+                dset.attrs['source_variable'] = self.orig_name
+
+            if (self.s is not None) and (self.krg is not None):
+                dset = grp_4.create_dataset(self.krg_name.split('/')[-1]+"_relative_uncertainty", (nx,ny), maxshape=(nx,ny), dtype=dt)
+                # initialize dataset values here
+                tmp = np.zeros(self.s.shape)
+                tmp[:,:] = np.sqrt(self.s)/self.krg
+                tmp[np.where(tmp == np.inf)] = np.nan
+                dset[:,:] = tmp 
+                # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
+                dset.attrs['units'] = 'dimensionless'
+                dset.attrs['coordinates'] = "latitude longitude"
+                dset.attrs['source_variable'] = self.orig_name
             
             # Group: /HDFEOS INFORMATION
             grp_1 = f.create_group('HDFEOS INFORMATION')

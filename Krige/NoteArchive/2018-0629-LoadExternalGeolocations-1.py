@@ -14,12 +14,12 @@ import sys
 from time import gmtime, strftime
 
 import Krige
-import MODIS_DataField as mdf
+import Krige.DataField as df
 
 import pykrige
 import pykrige.variogram_models as vm
 
-# from MODIS_DataField import MODIS_DataField, BoundingBox, mdf.Point, box_covering, Polygon, data_src_directory
+# from DataField import DataField, BoundingBox, df.Point, box_covering, Polygon, data_src_directory
 
 import numpy as np
 import matplotlib as mpl
@@ -49,7 +49,7 @@ _graph_results = True
 
 ##
 
-SRC_DIRECTORY_BASE=mdf.data_src_directory()
+SRC_DIRECTORY_BASE=df.data_src_directory()
 SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS/'
 # SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS-61/'
 
@@ -74,7 +74,7 @@ vmin=-2.0; vmax=1.25
 
 i = ('MYD05_L2.A2015304.2125.006.2015305175459.hdf','MYD03.A2015304.2125.006.2015305161909.hdf')
 
-modis_obj = mdf.MODIS_DataField(\
+modis_obj = df.DataField(\
                                 datafilename=i[0]\
                                 ,geofile=i[1]\
                                 ,datafieldname='Water_Vapor_Near_Infrared'\
@@ -113,8 +113,8 @@ if _plot_modis_obj:
 ## gridz  = np.zeros(gridx.shape)
 ## gridss = np.zeros(gridx.shape)
 ## 
-## krigeBox = mdf.BoundingBox((mdf.Point((np.nanmin(gridx),np.nanmin(gridy)))\
-##                             ,mdf.Point((np.nanmax(gridx),np.nanmin(gridy)))))
+## krigeBox = df.BoundingBox((df.Point((np.nanmin(gridx),np.nanmin(gridy)))\
+##                             ,df.Point((np.nanmax(gridx),np.nanmin(gridy)))))
 ##                             
 ## dx = Krige.span_array(gridx)
 ## dy = Krige.span_array(gridy)

@@ -14,9 +14,9 @@ import sys
 from time import gmtime, strftime
 
 import Krige
-import MODIS_DataField as mdf
+import Krige.DataField as df
 
-# from MODIS_DataField import MODIS_DataField, BoundingBox, mdf.Point, box_covering, Polygon, data_src_directory
+# from DataField import DataField, BoundingBox, df.Point, box_covering, Polygon, data_src_directory
 
 import numpy as np
 import matplotlib as mpl
@@ -72,7 +72,7 @@ m.drawmapboundary(fill_color='dimgrey')
 _load_datasets = ['MOD']
 
 # Choose the source directory for the data and metadata
-SRC_DIRECTORY_BASE=mdf.data_src_directory()
+SRC_DIRECTORY_BASE=df.data_src_directory()
 SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS-61/'
 SRC_METADATA=SRC_DIRECTORY+'modis_BoundingBoxes.json'
 
@@ -83,8 +83,8 @@ with open(SRC_METADATA,'r') as f:
     boxes_json = json.load(f)
 boxes = {}
 for i,v in boxes_json.iteritems():
-    lons,lats = mdf.BoundingBox().from_json(v).lons_lats()
-    boxes[i] = mdf.box_covering(lons,lats,hack_branchcut_threshold=180.0)
+    lons,lats = df.BoundingBox().from_json(v).lons_lats()
+    boxes[i] = df.box_covering(lons,lats,hack_branchcut_threshold=180.0)
 
 
 def log_map(x):
@@ -102,7 +102,7 @@ for i,v in boxes.iteritems():
             k=k-1
             plotk=plotk+1
             print 'plotk,boxk,file: '+str(plotk)+', '+str(boxk)+', '+i
-            modis_obj = mdf.MODIS_DataField(\
+            modis_obj = df.DataField(\
                                             datafilename=i\
                                             ,datafieldname='Water_Vapor_Infrared'\
                                             ,srcdirname=SRC_DIRECTORY\

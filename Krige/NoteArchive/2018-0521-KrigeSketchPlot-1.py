@@ -13,9 +13,9 @@ import sys
 from time import gmtime, strftime
 
 import Krige
-import MODIS_DataField as mdf
+import DataField as df
 
-# from MODIS_DataField import MODIS_DataField, BoundingBox, mdf.Point, box_covering, Polygon, data_src_directory
+# from DataField import DataField, BoundingBox, df.Point, box_covering, Polygon, data_src_directory
 
 import numpy as np
 import matplotlib as mpl
@@ -82,7 +82,7 @@ if True:
     m.drawmapboundary(fill_color='dimgrey')
     
     if _plot_source_data_outside_grid:
-        modis_obj_2 = mdf.MODIS_DataField(\
+        modis_obj_2 = df.DataField(\
                                           data=np.log10(data1[ex_grid]+1.0e-9)\
                                           ,latitude=latitude1[ex_grid]\
                                           ,longitude=longitude1[ex_grid])
@@ -93,7 +93,7 @@ if True:
                                 ,cmap=colormap_x)
 
     if _plot_source_data_inside_grid:
-        modis_obj_3 = mdf.MODIS_DataField(\
+        modis_obj_3 = df.DataField(\
                                           data=np.log10(data1[in_grid]+1.0e-9)\
                                           ,latitude=latitude1[in_grid]\
                                           ,longitude=longitude1[in_grid])

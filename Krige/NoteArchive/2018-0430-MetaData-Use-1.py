@@ -8,7 +8,8 @@
 import json
 import os
 import sys
-from MODIS_DataField import MODIS_DataField, BoundingBox, Point, box_covering, Polygon, data_src_directory
+import Krige
+from Krige.DataField import DataField, BoundingBox, Point, box_covering, Polygon, data_src_directory
 
 import numpy as np
 import matplotlib as mpl

@@ -12,7 +12,8 @@ from pyhdf.SD import SD, SDC
 from math import *
 from noggin import *
 
-from MODIS_DataField import MODIS_DataField
+import Krige
+from Krige.DataField import DataField
 
 # recalculate = False
 
@@ -930,7 +931,7 @@ m.drawcoastlines(linewidth=0.5)
 m.drawparallels(np.arange(-90, 91, 45))
 m.drawmeridians(np.arange(-180, 180, 45), labels=[True,False,False,True])
 
-mod05 = MODIS_DataField(\
+mod05 = DataField(\
                             datafilename='MOD05_L2.A2015304.1815.006.2015308155414.hdf'\
                             ,datafieldname='Water_Vapor_Infrared'\
                             ,srcdirname='MODIS/'\

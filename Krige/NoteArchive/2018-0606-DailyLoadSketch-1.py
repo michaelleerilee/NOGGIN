@@ -14,13 +14,13 @@ import sys
 from time import gmtime, strftime
 
 import Krige
-import Krige.MODIS_DataField as mdf
+import Krige.DataField as df
 
 
 import pykrige
 import pykrige.variogram_models as vm
 
-# from MODIS_DataField import MODIS_DataField, BoundingBox, mdf.Point, box_covering, Polygon, data_src_directory
+# from DataField import DataField, BoundingBox, df.Point, box_covering, Polygon, data_src_directory
 
 import numpy as np
 import matplotlib as mpl
@@ -50,7 +50,7 @@ _drive_OKrige_log_calc            = True
 ##
 ##
 
-SRC_DIRECTORY_BASE=mdf.data_src_directory()
+SRC_DIRECTORY_BASE=df.data_src_directory()
 
 ###########################################################################
 ##
@@ -128,7 +128,7 @@ _graph_results = True
 
 ###########################################################################
 
-modis_obj = mdf.MODIS_DataField(\
+modis_obj = df.DataField(\
                                 datafilename=i\
                                 ,datafieldname=_datafield\
                                 ,srcdirname=SRC_DIRECTORY\
@@ -168,8 +168,8 @@ gridss = np.zeros(gridx.shape)
 
 data_mx_in_grid = np.nanmax(data1)
 
-krigeBox = mdf.BoundingBox((mdf.Point((np.nanmin(gridx),np.nanmin(gridy)))\
-                            ,mdf.Point((np.nanmax(gridx),np.nanmin(gridy)))))
+krigeBox = df.BoundingBox((df.Point((np.nanmin(gridx),np.nanmin(gridy)))\
+                            ,df.Point((np.nanmax(gridx),np.nanmin(gridy)))))
                             
 # dx = span_array(gridx)
 dx = Krige.span_array(gridx)
@@ -278,7 +278,6 @@ if True:
     print 'mnmx(kr.s):     ',np.nanmin(krige_results[-1].s)     ,np.nanmax(krige_results[-1].s)
 
 if True:
-    # Not correct: krige_results[-1].save()
     variable_name   = krige_results[-1].zVariableName
     output_filename = "DailyLoadSketch_"+modis_obj.datafilename+".hdf"
     if '.hdf.hdf' in output_filename[-8:]:

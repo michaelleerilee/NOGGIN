@@ -37,6 +37,6 @@ from . import core
 # from Krige import krigeHDF
 from core import *
 
-__all__ = ["core","MODIS_DataField"]
+__all__ = ["core","DataField"]
 
 

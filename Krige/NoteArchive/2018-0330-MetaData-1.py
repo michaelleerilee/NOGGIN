@@ -13,7 +13,8 @@ not the existing file is useful.
 import json
 import os
 import sys
-from MODIS_DataField import MODIS_DataField, BoundingBox, Point
+import Krige
+from Krige.DataField import DataField, BoundingBox, Point
 
 import numpy as np
 import matplotlib as mpl
@@ -72,7 +73,7 @@ bb = BoundingBox()
 for i in src_file_list:
     if _verbose:
         print ('loading ',i)
-    modis_obj = MODIS_DataField(\
+    modis_obj = DataField(\
                                 datafilename=i\
                                 ,datafieldname='Water_Vapor_Infrared'\
                                 ,srcdirname=SRC_DIRECTORY\

@@ -12,9 +12,9 @@ import sys
 from time import gmtime, strftime
 
 import Krige
-import Krige.MODIS_DataField as mdf
+import Krige.DataField as df
 
-# from MODIS_DataField import MODIS_DataField, BoundingBox, mdf.Point, box_covering, Polygon, data_src_directory
+# from DataField import DataField, BoundingBox, df.Point, box_covering, Polygon, data_src_directory
 
 import numpy as np
 import matplotlib as mpl
@@ -84,7 +84,7 @@ m.drawparallels(np.arange(-90.0, 91., 10.), labels=[1, 0, 0, 0])
 m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
 
 # if _plot_source_data_outside_grid:
-#     modis_obj_2 = mdf.MODIS_DataField(\
+#     modis_obj_2 = df.DataField(\
 #                                       data=data1[ex_grid]\
 #                                       ,latitude=latitude1[ex_grid]\
 #                                       ,longitude=longitude1[ex_grid])
@@ -148,7 +148,7 @@ if _plot_kriged:
             if _plot_source_data and kr.dbg:
                 
                 #                                  data=np.log10(kr.src_z+1.0e-9)\
-                modis_obj_2 = mdf.MODIS_DataField(\
+                modis_obj_2 = df.DataField(\
                                                   data=kr.dbg_z\
                                                   ,latitude=kr.dbg_y\
                                                   ,longitude=kr.dbg_x\
@@ -167,7 +167,7 @@ if _plot_kriged:
             if _plot_source_data_last_sample:
                 
                 #                                  data=np.log10(kr.src_z+1.0e-9)\
-                modis_obj_3 = mdf.MODIS_DataField(\
+                modis_obj_3 = df.DataField(\
                                                   data=kr.src_z\
                                                   ,latitude=kr.src_y\
                                                   ,longitude=kr.src_x\

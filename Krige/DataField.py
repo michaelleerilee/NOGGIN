@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Prepare a MODIS datafield for further processing using python tools. Provide a basic viewing capability.
+Prepare a (MODIS, etc.) datafield for further processing using python tools. Provide a basic viewing capability.
 
 2018-0423-1352-44-EDT ML Rilee, RSTLLC, mike@rilee.net.
 """
@@ -352,8 +352,8 @@ class BoundingBox(object):
         lon,lat=p.inDegrees()
         return self.lon_interval.contains(lon) and self.lat_interval.contains(lat)
 
-class MODIS_DataField(object):
-    """Access a datafield in a MODIS file"""
+class DataField(object):
+    """Access a datafield in an HDFEOS (was MODIS) file"""
     # TODO Add an object or classes that can handle swath or grid
     # TODO rename key_*...
     key_along  ='Cell_Along_Swath_5km:mod05'
@@ -962,33 +962,33 @@ class TestPoint(unittest.TestCase):
                          .overlap(box_covering([-177.0,177.0],[40.0,50.0]))[1].to_xml())
         
 
-    def test_MODIS_bbox(self):
+    def test_bbox(self):
         SRC_DIRECTORY=data_src_directory()+'MODIS/'
-        test_modis_obj_0 = MODIS_DataField(\
+        test_obj_0 = DataField(\
                                         datafilename='MYD05_L2.A2015304.2125.006.2015305175459.hdf'\
                                         ,datafieldname='Water_Vapor_Infrared'\
                                         ,srcdirname=SRC_DIRECTORY\
                                         )
-        test_modis_obj_1 = MODIS_DataField(\
+        test_obj_1 = DataField(\
                                          datafilename='MOD05_L2.A2015304.1815.006.2015308155414.hdf'\
                                          ,datafieldname='Water_Vapor_Infrared'\
                                          ,srcdirname=SRC_DIRECTORY\
                                          )
-        # print test_modis_obj_0.bbox.to_xml()
-        # print test_modis_obj_1.bbox.to_xml()
-        # print test_modis_obj_0.bbox.overlap(test_modis_obj_1.bbox).to_xml()
-        # print test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox).to_xml()
+        # print test_obj_0.bbox.to_xml()
+        # print test_obj_1.bbox.to_xml()
+        # print test_obj_0.bbox.overlap(test_obj_1.bbox).to_xml()
+        # print test_obj_1.bbox.overlap(test_obj_0.bbox).to_xml()
         self.assertEqual( '<BoundingBox>\n'\
                           +'  <Point lon_degrees=-125.55471 lat_degrees=16.427057/>\n'\
                           +'  <Point lon_degrees=-108.90769 lat_degrees=34.175877/>\n'\
                           +'</BoundingBox>\n'\
-                          ,test_modis_obj_1.bbox.overlap(test_modis_obj_0.bbox)[0].to_xml() )
+                          ,test_obj_1.bbox.overlap(test_obj_0.bbox)[0].to_xml() )
 
         self.assertEqual( '<BoundingBox>\n'\
                           +'  <Point lon_degrees=-135.69511 lat_degrees=13.147603/>\n'\
                           +'  <Point lon_degrees=-98.01473 lat_degrees=37.473373/>\n'\
                           +'</BoundingBox>\n'\
-                          ,test_modis_obj_1.bbox.union(test_modis_obj_0.bbox).to_xml() )
+                          ,test_obj_1.bbox.union(test_obj_0.bbox).to_xml() )
         
     def test_json(self):
         self.assertEqual('["BoundingBox", {"p0": [0.0, 0.0], "p1": [1.0, 1.0]}]'\
@@ -1013,23 +1013,23 @@ class TestPoint(unittest.TestCase):
 
         globeBox=BoundingBox((Point((-180.0,-90.0)),Point((180.0,90.0))))
         SRC_DIRECTORY=data_src_directory()+'MODIS/'
-        test_modis_obj_0 = MODIS_DataField(\
+        test_obj_0 = DataField(\
                                         datafilename='MYD05_L2.A2015304.2125.006.2015305175459.hdf'\
                                         ,datafieldname='Water_Vapor_Infrared'\
                                         ,srcdirname=SRC_DIRECTORY\
                                         )
-        b=globeBox.overlap(test_modis_obj_0.bbox)
+        b=globeBox.overlap(test_obj_0.bbox)
         self.assertEqual(False,b[0].emptyp())
-        self.assertEqual(False,globeBox.overlap(test_modis_obj_0.bbox)[0].emptyp())
-        # print 't',test_modis_obj_0.bbox.to_xml()
+        self.assertEqual(False,globeBox.overlap(test_obj_0.bbox)[0].emptyp())
+        # print 't',test_obj_0.bbox.to_xml()
         # print 'g',globeBox.to_xml()
         # print 'b',b.to_xml()
         # The following is the key to the bug.
-        obj_bb=BoundingBox().from_json(test_modis_obj_0.bbox.to_json())
+        obj_bb=BoundingBox().from_json(test_obj_0.bbox.to_json())
         self.assertEqual(False,obj_bb.emptyp())
         self.assertEqual(False,globeBox.overlap(obj_bb)[0].emptyp())
         
-def demo_modis_obj(show=False):
+def demo_obj(show=False):
     if not show:
         return
     
@@ -1044,34 +1044,34 @@ def demo_modis_obj(show=False):
 
     print('loading: ',SRC_DIRECTORY+'MYD05_L2.A2015304.2125.006.2015305175459.hdf\n')
     
-    test_modis_obj = MODIS_DataField(\
+    test_obj = DataField(\
                                         datafilename='MYD05_L2.A2015304.2125.006.2015305175459.hdf'\
                                         ,datafieldname='Water_Vapor_Infrared'\
                                         ,srcdirname=SRC_DIRECTORY\
                                         )
-    test_modis_obj.colormesh(vmin=1.0,vmax=3.0\
+    test_obj.colormesh(vmin=1.0,vmax=3.0\
                                  ,colorbar=True\
                                  )
 
     fig_gen.increment_figure()
-    # test_modis_obj.colormesh()
-    test_modis_obj = MODIS_DataField(\
+    # test_obj.colormesh()
+    test_obj = DataField(\
                                          datafilename='MOD05_L2.A2015304.1815.006.2015308155414.hdf'\
                                          ,datafieldname='Water_Vapor_Infrared'\
                                          ,srcdirname=SRC_DIRECTORY\
                                          )
-    test_modis_obj.colormesh(vmin=1.0,vmax=3.0)
+    test_obj.colormesh(vmin=1.0,vmax=3.0)
 
-    # print test_modis_obj.bbox.to_xml()
+    # print test_obj.bbox.to_xml()
 
     fig_gen.increment_figure()
-    test_modis_obj_1 = MODIS_DataField(\
-                                           data       = test_modis_obj.data\
-                                           ,latitude  = test_modis_obj.latitude\
-                                           ,longitude = test_modis_obj.longitude\
+    test_obj_1 = DataField(\
+                                           data       = test_obj.data\
+                                           ,latitude  = test_obj.latitude\
+                                           ,longitude = test_obj.longitude\
                                            )
-    # test_modis_obj_1.colormesh(vmin=1.0,vmax=3.0)                                           
-    test_modis_obj_1.scatterplot(vmin=1.0,vmax=3.0,title='scatter',colorbar=True)
+    # test_obj_1.colormesh(vmin=1.0,vmax=3.0)                                           
+    test_obj_1.scatterplot(vmin=1.0,vmax=3.0,title='scatter',colorbar=True)
 
     plt.show()
 
@@ -1079,7 +1079,7 @@ def demo_modis_obj(show=False):
     
 if __name__ == '__main__':
 
-    demo_modis_obj(False)
+    demo_obj(False)
 
     if True:
         unittest.main()

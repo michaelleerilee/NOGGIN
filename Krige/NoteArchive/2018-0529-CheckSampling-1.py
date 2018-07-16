@@ -7,8 +7,8 @@ noggin.adaptive_index.
 
 import math
 import os
-import noggin
-import MODIS_DataField as mdf
+import Krige
+import Krige.DataField as df
 
 import numpy as np
 import matplotlib as mpl

@@ -22,9 +22,9 @@ import sys
 from time import gmtime, strftime
 
 import Krige
-import MODIS_DataField as mdf
+import Krige.DataField as df
 
-# from MODIS_DataField import MODIS_DataField, BoundingBox, mdf.Point, box_covering, Polygon, data_src_directory
+# from DataField import DataField, BoundingBox, df.Point, box_covering, Polygon, data_src_directory
 
 import numpy as np
 import matplotlib as mpl
@@ -80,7 +80,7 @@ _capture_data_z    = None
 _load_datasets = ['MOD']
 
 # Choose the source directory for the data and metadata
-SRC_DIRECTORY_BASE=mdf.data_src_directory()
+SRC_DIRECTORY_BASE=df.data_src_directory()
 SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS-61/'
 SRC_METADATA=SRC_DIRECTORY+'modis_BoundingBoxes.json'
 
@@ -105,7 +105,7 @@ SRC_METADATA=SRC_DIRECTORY+'modis_BoundingBoxes.json'
 ##         if box is not None:
 ##             self.box = box.copy()
 ##         else:
-##             self.box = mdf.BoundingBox()
+##             self.box = df.BoundingBox()
 ##         if vg_parameters is not None:
 ##             self.vg_parameters = vg_parameters
 ##         self.note = str(note)
@@ -130,7 +130,7 @@ SRC_METADATA=SRC_DIRECTORY+'modis_BoundingBoxes.json'
 ##         self.z = None
 ##         self.s = None
 ##         self.hull = None
-##         self.box = mdf.BoundingBox()
+##         self.box = df.BoundingBox()
 ##         self.note = 'Default note for krigeResults'
 ##     def construct_hull(self):
 ##         """Construct the hull from z,x,y. z is used to get the shape of the data, 
@@ -151,13 +151,13 @@ with open(SRC_METADATA,'r') as f:
     boxes_json = json.load(f)
 boxes = {}
 for i,v in boxes_json.iteritems():
-    lons,lats = mdf.BoundingBox().from_json(v).lons_lats()
-    boxes[i] = mdf.box_covering(lons,lats,hack_branchcut_threshold=180.0)
+    lons,lats = df.BoundingBox().from_json(v).lons_lats()
+    boxes[i] = df.box_covering(lons,lats,hack_branchcut_threshold=180.0)
 
 # Choose box to krige
 # Memory Error
-# krigeBox = mdf.BoundingBox((mdf.Point((+125.0, 30.0))\
-#                             ,mdf.Point((+185.0, 60.0))))
+# krigeBox = df.BoundingBox((df.Point((+125.0, 30.0))\
+#                             ,df.Point((+185.0, 60.0))))
 #
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 
@@ -230,17 +230,18 @@ k = -1
 # divergence_threshold = 1.5
 # npts_increase_factor = 1.5
 # 
-# targetBoxes.append(mdf.BoundingBox((mdf.Point((-180, -90))\
-#                                     ,mdf.Point((180, -90+dLat)))))
+# targetBoxes.append(df.BoundingBox((df.Point((-180, -90))\
+#                                     ,df.Point((180, -90+dLat)))))
 # 
-# targetBoxes.append(mdf.BoundingBox((mdf.Point((-180, 90-dLat))\
-#                                     ,mdf.Point((180, 90)))))
+# targetBoxes.append(df.BoundingBox((df.Point((-180, 90-dLat))\
+#                                     ,df.Point((180, 90)))))
 
 # ### FULL with bands and caps
 dLon = 120
 dLat = 10
 dSearch = 0.75*dLon
 lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  90-dLat
+lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  -60-dLat
 # lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 = -60-dLat
 lores_npts = 2000
 hires_npts = 4000
@@ -251,16 +252,16 @@ hires_calc = []
 divergence_threshold = 1.5
 npts_increase_factor = 1.5
 
-cap_south = mdf.BoundingBox((mdf.Point((-180, -90))\
-                             ,mdf.Point((180, -90+dLat))))
+cap_south = df.BoundingBox((df.Point((-180, -90))\
+                             ,df.Point((180, -90+dLat))))
 targetBoxes.append(cap_south)
 
-cap_north = mdf.BoundingBox((mdf.Point((-180, 90-dLat))\
-                             ,mdf.Point((180, 90))))
+cap_north = df.BoundingBox((df.Point((-180, 90-dLat))\
+                             ,df.Point((180, 90))))
 targetBoxes.append(cap_north)
 
-# targetBoxes.append(mdf.BoundingBox((mdf.Point((iLon, jLat))\
-#                                     ,mdf.Point((iLon+dLon, jLat+dLat)))))
+# targetBoxes.append(df.BoundingBox((df.Point((iLon, jLat))\
+#                                     ,df.Point((iLon+dLon, jLat+dLat)))))
 
 # ### SMALL CENTER
 # lon0 = -30; lon1 = 30; lat0 = -30; lat1 = 30
@@ -281,8 +282,8 @@ targetBoxes.append(cap_north)
 
 for iLon in range(lon0,lon1,dLon):
     for jLat in range(lat0,lat1,dLat):
-        krigeBox = mdf.BoundingBox((mdf.Point((iLon, jLat))\
-                                    ,mdf.Point((iLon+dLon, jLat+dLat))))
+        krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
+                                    ,df.Point((iLon+dLon, jLat+dLat))))
         targetBoxes.append(krigeBox)
 
 k=-1
@@ -309,14 +310,14 @@ for krigeBox in targetBoxes:
             print 'loading iLon,jLat: '+str(iLon)+','+str(jLat)
             print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
             
-            # krigeBox = mdf.BoundingBox((mdf.Point((iLon, jLat))\
-            #                             ,mdf.Point((iLon+dLon, jLat+dLat))))
+            # krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
+            #                             ,df.Point((iLon+dLon, jLat+dLat))))
     
-            searchBox = mdf.BoundingBox((mdf.Point((iLon-dSearch,      max(-90, min(jLat-dSearch, 90))))\
-                                        ,mdf.Point((iLon+dLon+dSearch, max(-90, min(jLat+dLat+dSearch, 90))))))
+            searchBox = df.BoundingBox((df.Point((iLon-dSearch,      max(-90, min(jLat-dSearch, 90))))\
+                                        ,df.Point((iLon+dLon+dSearch, max(-90, min(jLat+dLat+dSearch, 90))))))
     
-            # krigeBox = mdf.BoundingBox((mdf.Point((+135.0, 30.0))\
-            #                            ,mdf.Point((+175.0, 45.0))))
+            # krigeBox = df.BoundingBox((df.Point((+135.0, 30.0))\
+            #                            ,df.Point((+175.0, 45.0))))
     
     
             # Find overlapping granules and load the MODIS objects
@@ -338,7 +339,7 @@ for krigeBox in targetBoxes:
                                     # load the data
                                     print 'loading '+i+' from '+SRC_DIRECTORY
                                     # print 'type(i): '+str(type(i))
-                                    modis_obj = mdf.MODIS_DataField(\
+                                    modis_obj = df.DataField(\
                                                                     datafilename=i\
                                                                     ,datafieldname='Water_Vapor_Infrared'\
                                                                     ,srcdirname=SRC_DIRECTORY\
@@ -370,7 +371,7 @@ for krigeBox in targetBoxes:
             longitude1 = longitude[idx]
 
         
-            # modis_obj_1 = MODIS_DataField(data=data1,latitude=latitude1,longitude=longitude1)
+            # modis_obj_1 = DataField(data=data1,latitude=latitude1,longitude=longitude1)
             # modis_obj_1.scatterplot(vmin=1.0,vmax=4.0,title='scatter')
             # modis_obj_1.colormesh(vmin=1.0,vmax=3.0,title='scatter')
             
@@ -511,18 +512,23 @@ for krigeBox in targetBoxes:
                 kr.title         = modis_obj.datafilename
                 kr.zVariableName = modis_obj.datafieldname
                 kr_mx = np.nanmax(kr.z)
+                kr_s_mn = np.nanmin(kr.s)
+                kr_s_mx = np.nanmax(kr.s)
                 max_iter = max_iter - 1
-                print 'kr_mx,data_mx_in_grid: ',kr_mx,data_mx_in_grid
-                if (max_iter < 1) or (kr_mx < divergence_threshold * data_mx_in_grid):
+                print 'kr_mx,data_mx_in_grid:     ',kr_mx,data_mx_in_grid
+                print 'kr_s_mn,kr_s_mn:           ',kr_s_mn,kr_s_mx
+                if (max_iter < 1) or ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
                     if (max_iter < 1):
-                        print 'kriging diverged, max_iter exceeded, continuing to next tile'
+                        print '**'
+                        print '*** kriging diverged, max_iter exceeded, continuing to next tile'
                     break
                 else:
-                    print 'kriging diverged, changing npts, iter: ',max_iter_start-1-max_iter
+                    print '***'
+                    print '*** kriging diverged, changing npts, iter: ',max_iter_start-1-max_iter
                     if np.inf in kr.z:
                         if inf_detected:
                             print 'inf detected again, increasing npts'
-                            npts_in = npts_in*npts_increaase_factor
+                            npts_in = npts_in*npts_increase_factor
                             inf_detected = False
                         else:
                             print 'inf detected, reducing npts'
@@ -591,7 +597,52 @@ plot_configuration = Krige.krigePlotConfiguration(source_data              = Fal
                                                   ,zVariableName = krigeSketch_results[0].zVariableName\
                                                   ,vmap          = Krige.log10_map\
 )
+
+# Save an HDF file
+# TODO The following is currently broken
+# TODO Apparently SWATH does not mean irregular.
+if False:
+    n_across = len(krigeSketch_results[-1].x)
+    n_along  = 0
+    for kr in krigeSketch_results:
+        n_along = n_along + len(kr.x)/n_across
+    x = np.zeros((n_along,n_across)); x.fill(np.nan)
+    y = np.zeros((n_along,n_across)); y.fill(np.nan)
+    z = np.zeros((n_along,n_across)); z.fill(np.nan)
+    s = np.zeros((n_along,n_across)); s.fill(np.nan)
+    nans = np.zeros((n_along,n_across)); nans.fill(np.nan)
+
+    i=0
+    for kr in krigeSketch_results:
+        for j in range(len(kr.x)/n_across):
+            x[i,:] = kr.x[j*n_across:(j+1)*n_across]
+            y[i,:] = kr.y[j*n_across:(j+1)*n_across]
+            z[i,:] = kr.z[j*n_across:(j+1)*n_across]
+            s[i,:] = kr.s[j*n_across:(j+1)*n_across]
+            i = i + 1
                                                    
+    variable_name   = krigeSketch_results[-1].zVariableName
+    output_filename = "KrigeSketch_"+modis_obj.datafilename+".hdf"
+    if '.hdf.hdf' in output_filename[-8:]:
+        output_filename = output_filename[:-4]
+        
+    kHDF = Krige.krigeHDF(\
+                          krg_name                 = variable_name+'_krg'\
+                          ,krg_units               = modis_obj.units\
+                          ,config                  = krigeSketch_results[-1].config\
+                          ,krg_z                   = z
+                          ,krg_s                   = s
+                          ,krg_x                   = x
+                          ,krg_y                   = y
+                          ,orig_name               = modis_obj.datafieldname\
+                          ,orig_units              = modis_obj.units\
+                          ,orig_z                  = nans
+                          ,orig_x                  = x
+                          ,orig_y                  = y
+                          ,output_filename         = output_filename\
+                          ,redimension             = False\
+    )
+    kHDF.save()
 
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 end_time = time.time()

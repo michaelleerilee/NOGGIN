@@ -13,7 +13,8 @@ from math import *
 from noggin import *
 
 # from operator import add
-from MODIS_DataField import MODIS_DataField
+import Krige
+from Krige.DataField import DataField
 
 # for kriging, plotting
 from scipy.spatial import ConvexHull
@@ -46,7 +47,7 @@ n=len(FILE_NAMES_1)
 modis_objs = []
 for i in range(f0,f1):
     print('i: ',i)
-    modis_obj = MODIS_DataField(\
+    modis_obj = DataField(\
                                          datafilename=FILE_NAMES_1[i]\
                                          ,datafieldname='Water_Vapor_Infrared'\
                                          ,srcdirname=MODIS_DIR\
@@ -77,7 +78,7 @@ data1      = data[idx]
 latitude1  = latitude[idx]
 longitude1 = longitude[idx]
     
-modis_obj_1 = MODIS_DataField(data=data1,latitude=latitude1,longitude=longitude1)
+modis_obj_1 = DataField(data=data1,latitude=latitude1,longitude=longitude1)
 modis_obj_1.scatterplot(vmin=1.0,vmax=4.0,title='scatter')
 # modis_obj_1.colormesh(vmin=1.0,vmax=3.0,title='scatter')
 
@@ -183,7 +184,7 @@ grid_hull = ConvexHull(xy1)
 
 fig_gen = fig_generator(1,1)
 
-modis_obj_2 = MODIS_DataField(data=data1[ex_grid],latitude=latitude1[ex_grid],longitude=longitude1[ex_grid])
+modis_obj_2 = DataField(data=data1[ex_grid],latitude=latitude1[ex_grid],longitude=longitude1[ex_grid])
 
 modis_obj_2.scatterplot(title='scatter',plt_show = False\
                             ,vmin=vmin,vmax=vmax\
@@ -209,7 +210,7 @@ if True:
 
 if True:
     fig_gen.increment_figure()
-    mod05_obj = MODIS_DataField(\
+    mod05_obj = DataField(\
                                          datafilename=COMPARISON_FILE\
                                          ,srcdirname=COMPARISON_DIR\
                                          ,datafieldname='Water_Vapor_Infrared'\
@@ -258,7 +259,7 @@ gridz2, data_x2, data_y2, data_z2 = drive_OKrige(\
 
 in_grid2 = grid.in_grid(longitude2,latitude2)
 ex_grid2 = grid.ex_grid(longitude2,latitude2)
-mod05_obj_2 = MODIS_DataField(data=data2[ex_grid2],latitude=latitude2[ex_grid2],longitude=longitude2[ex_grid2])
+mod05_obj_2 = DataField(data=data2[ex_grid2],latitude=latitude2[ex_grid2],longitude=longitude2[ex_grid2])
 
 mod05_obj_2.scatterplot(title='scatter',plt_show = False\
                             ,vmin=vmin,vmax=vmax\
