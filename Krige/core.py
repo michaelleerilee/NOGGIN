@@ -161,7 +161,7 @@ class krigePlotConfiguration(object):
                  ,vmax                    = 1.25\
                  ,vmap                    = None\
                  ,title                   = 'title'\
-                 ,zVariableName           = 'z'\
+                 ,zVariableName           = 'z'
                  ):
         self.kriged                  = kriged
         self.kriged_data             = kriged_data
@@ -180,6 +180,7 @@ class krigePlotConfiguration(object):
         self.vmap                    = vmap
         self.title                   = title
         self.zVariableName           = zVariableName
+        
         
 
 class krigeResults(object):
@@ -567,10 +568,12 @@ def fit_variogram(x,y,z
                   ,anisotropy_angle=0.0
                   ,nlags=12,weight=False
                   ,coordinates_type='geographic'
+                  ,verbose=False
 ):
     """Fit the variogram, based on code from PyKrige 1.4. Try to elide asap.
 """
-    print('fit_variogram using '+str(variogram_model)+' and '+coordinates_type)
+    if verbose:
+        print('fit_variogram using '+str(variogram_model)+' and '+coordinates_type)
     # Code assumes 1D input arrays. Ensures that any extraneous dimensions
     # don't get in the way. Copies are created to avoid any problems with
     # referencing the original passed arguments.
@@ -667,6 +670,7 @@ class krigeConfig(object):
                  ,grid_stride          = None\
                  ,random_permute       = None\
                  ,coordinates_type     = None\
+                 ,sampling             = None\
     ):
         self.noggin_krige_version = Krige.__version__
         self.pykrige_version      = pykrige.__version__
@@ -682,13 +686,15 @@ class krigeConfig(object):
         self.grid_stride          = grid_stride
         self.random_permute       = random_permute
         self.coordinates_type     = coordinates_type
+        self.sampling             = sampling
     def as_dict(self):
         return \
             {\
              'noggin_krige_version': self.noggin_krige_version\
              ,'pykrige_version'    : self.pykrige_version\
              ,'coordinates_type'   : self.coordinates_type\
-             ,'adaptive_sampling'  : \
+             ,'sampling'           : self.sampling\
+             ,'sampling_parameters': \
              {\
               'npts'   : self.npts\
               ,'beta0' : self.beta0\
@@ -739,6 +745,7 @@ def drive_OKrige(
         ,eps=1.0e-10
         ,backend='vectorized'
         ,coordinates_type='geographic'
+        ,sampling='adaptive'
         ):
     """Krige from src_ arguments to x,y returning the kriged result gridz, gridss
 and the data_ and the variogram_parameters of the last sub-calculation.
@@ -769,33 +776,53 @@ and the data_ and the variogram_parameters of the last sub-calculation.
         g_lon = x[i_target_portion]
         g_lat = y[i_target_portion]
 
-        # # Sample the source data.
-        # # l,w form a window from which to sample.
-        # src_idx = adaptive_index(
-        #     center_array(g_lon)
-        #     ,center_array(g_lat)
-        #     ,src_x,src_y
-        #     ,npts=min(npts,len(src_x)),beta0=beta0,frac=frac,l=l,w=w
-        #     ,distribution='normal'
-        # )
 
-        src_idx = np.full(src_x.shape,False)
-        stride = src_x.size/min(npts,src_x.size)
-        print('stride: ',stride)
-        for i in range(0,src_x.size,int(stride)):
-            src_idx[i] = True
-##mlr##
-#            ,lat_bounds=[-89.75,89.75]
-#            ,lat_bounds=[-89.99,89.99]
-        print('processing '+str(i)\
+        if sampling == 'adaptive':
+            # Sample the source data.
+            # l,w form a window from which to sample.
+            src_idx = adaptive_index(
+                center_array(g_lon)
+                ,center_array(g_lat)
+                ,src_x,src_y
+                ,npts=min(npts,len(src_x)),beta0=beta0,frac=frac,l=l,w=w
+                ,distribution='normal'
+            )
+        elif sampling == 'decimate':
+            src_idx = np.full(src_x.shape,False)
+            stride = src_x.size/min(npts,src_x.size)
+            # print('stride: ',stride)
+            for i in range(0,src_x.size,int(stride)):
+                src_idx[i] = True
+        elif sampling is None:
+            src_idx = np.full(src_x.shape,False)
+            stride = 1
+            # print('stride: ',stride)
+            for i in range(0,src_x.size,int(stride)):
+                src_idx[i] = True
+        else:
+            print('drive_OKrige: sampling not understood, equals '+str(sampling))
+            print('drive_OKrige: continuing with adaptive as default')
+            # NOTE: Cut & pasted from case above.
+            src_idx = adaptive_index(
+                center_array(g_lon)
+                ,center_array(g_lat)
+                ,src_x,src_y
+                ,npts=min(npts,len(src_x)),beta0=beta0,frac=frac,l=l,w=w
+                ,distribution='normal'
+            )
+
+        if verbose:
+            print('dok: processing '+str(i)\
                   +' of '+str(x.size)\
                   +',  '+str(int(100*float(i)/x.size))\
                   +'% done')
-        print('src_x.size:     '+str(src_x.size))
-        print('src_idx.size:   '+str(src_idx.size)+', valid: src_idx[src_idx].size= '+str(src_idx[src_idx].size))
+            print('dok: src_x.size:     '+str(src_x.size))
+            print('dok: src_idx.size:   '+str(src_idx.size)\
+                  +', valid: src_idx[src_idx].size= '+str(src_idx[src_idx].size))
         
         data_x         = src_x[src_idx];
-        print('data_x.size='+str(data_x.size))
+        if verbose:
+            print('dok: data_x.size='+str(data_x.size))
         ## Adapt to geographic coordinates used by PyKrige
         data_x1        = np.copy(data_x)
 
@@ -810,7 +837,8 @@ and the data_ and the variogram_parameters of the last sub-calculation.
         else:
             data_z1    = np.copy(data_z)
 
-        print('dok: mnmx(data_z1): '+str((np.nanmin(data_z1),np.nanmax(data_z1))))
+        if verbose:
+            print('dok: mnmx(data_z1): '+str((np.nanmin(data_z1),np.nanmax(data_z1))))
             
         ##mlr##
         if coordinates_type == 'geographic':
@@ -827,8 +855,10 @@ and the data_ and the variogram_parameters of the last sub-calculation.
                 ,nlags=nlags
                 ,weight=weight
                 ,coordinates_type=coordinates_type
+                ,verbose=verbose
                 )
-            print('parms: ',parms)
+            if verbose:
+                print('dok: parms: '+str(parms))
             variogram_parameters = list(parms)
 
 	    OK = OrdinaryKriging(     data_x1, data_y, data_z1\
@@ -855,7 +885,8 @@ and the data_ and the variogram_parameters of the last sub-calculation.
 	    gridss[i_target_portion] = ss[:]
 
     # TODO Need to return gridss
-    print 1000
+    if verbose:
+        print('dok: finishing up, saving configuration')
     config = krigeConfig(\
                          npts                  = npts\
                          ,beta0                = beta0\

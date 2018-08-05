@@ -46,6 +46,7 @@ _drive_OKrige_enable_statistics   = False
 _drive_OKrige_log_calc            = True
 _drive_OKrige_random_permute      = True
 _drive_OKrige_coordinates_type    = 'geographic'
+_drive_OKrige_sampling            = 'adaptive' # or 'decimate' or 'None'
 
 #  Iteration control parameters
 #
@@ -84,8 +85,12 @@ _DailyLoad_Case = 'OMI-Total_Ozone-Case-1'
 if _DailyLoad_Case == 'MODIS-Water_Vapor_Mean-Case-1':
     _datafield = 'Atmospheric_Water_Vapor_Mean'
     vmin=-2.0; vmax=1.25
-    npts = 2500
-    npts =  50
+    npts = 1000
+    # npts = 2500
+    # npts = 5000
+    # npts = 10000
+    #+? npts =  50
+    # npts =  500
     _variogram_model = 'gamma_rayleigh_nuggetless_variogram_model'
     # _variogram_model = 'spherical'
     # _variogram_model = 'spherical_variogram_model'
@@ -93,15 +98,17 @@ if _DailyLoad_Case == 'MODIS-Water_Vapor_Mean-Case-1':
     _drive_OKrige_weight              = True
     _drive_OKrige_log_calc            = True
     _drive_OKrige_random_permute      = True
-    _drive_OKrige_verbose             = True
+    _drive_OKrige_verbose             = False
     _drive_OKrige_coordinates_type    = 'geographic'
-    # _drive_OKrige_coordinates_type    = 'euclidean'
+    _drive_OKrige_backend             = 'vectorized'
+    # _drive_OKrige_sampling            = 'decimate' # uses npts to set stride
+    _drive_OKrige_sampling            = 'adaptive' # uses npts to set stride
 
-    _plot_kriged_data_outline = True    
+    _plot_kriged_data_outline = False
     
     max_iter = 10
-    npts_increase_factor = 1.125
-    npts_decrease_factor = 1.125
+    npts_increase_factor = 0.8
+    npts_decrease_factor = 0.8
 
     grid_stride_scale = 1
     
@@ -139,7 +146,13 @@ if _DailyLoad_Case == 'MODIS-Total_Ozone_Burden-Case-1':
 if _DailyLoad_Case == 'OMI-Total_Ozone-Case-1':
     _datafield = '/HDFEOS/GRIDS/OMI Column Amount O3/Data Fields/ColumnAmountO3'
     vmin=1.5; vmax=2.75
-    npts = 100
+    #+ npts = 260
+    # npts = 250 # looks not-terrible
+    npts = 300 # looks not-terrible
+    # npts = 500 # looks not-terrible
+    # npts = 1000
+    # npts = 5000
+    # npts = 10000 # looks good
     # _variogram_model = 'linear_variogram_model'
     # _variogram_model = 'power_variogram_model'
     # _variogram_model = 'gaussian_variogram_model'
@@ -153,9 +166,9 @@ if _DailyLoad_Case == 'OMI-Total_Ozone-Case-1':
 
     _plot_kriged_data_outline = False    
 
-    max_iter = 10
-    npts_increase_factor = 1.5
-    npts_decrease_factor = 1.5
+    max_iter = 1
+    npts_increase_factor = 0.8
+    npts_decrease_factor = 0.8
 
     grid_stride_scale = 1
     
@@ -165,6 +178,7 @@ if _DailyLoad_Case == 'OMI-Total_Ozone-Case-1':
     # i = "OMI-Aura_L3-OMTO3d_2015m1014_v003-2015m1016t021656.he5"
     # i = "OMI-Aura_L3-OMTO3d_2015m1015_v003-2015m1017t024934.he5"
 
+    ## Why are loop and vectorized yielding slightly different stabilities?
     # _drive_OKrige_backend             = 'loop'
     _drive_OKrige_backend               = 'vectorized'
     _drive_OKrige_verbose               = True
@@ -219,7 +233,7 @@ if _plot_modis_obj:
 lon0=-180; lat0=-90
 dlon=720
 dlat=180
-npts=200
+# npts=200
 
 ###########################################################################
 # lon0=120; lat0=20
@@ -336,6 +350,7 @@ while( True ):
                            ,eps                = _drive_OKrige_eps\
                            ,backend            = _drive_OKrige_backend\
                            ,coordinates_type   = _drive_OKrige_coordinates_type\
+                           ,sampling           = _drive_OKrige_sampling\
         )
     kr_mx    = np.nanmax(kr.z)
     kr_s_mn  = np.nanmin(kr.s)
@@ -360,7 +375,10 @@ while( True ):
     if (max_iter < 1) or ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
         if (max_iter < 1):
             print '**'
-            print '*** kriging diverged, max_iter exceeded, continuing to next tile'
+            print '*** max_iter exceeded, continuing to next tile'
+        if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
+            print '**'
+            print '*** kriging seems to have converged'
         break
     else:
         print '***'
