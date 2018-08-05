@@ -33,6 +33,7 @@ _plot_source_data_last_sample  = plot_configuration.source_data_last_sample
 _plot_kriged_data              = plot_configuration.kriged_data
 _plot_kriged_outline           = plot_configuration.kriged_outline
 _plot_variogram                = plot_configuration.variogram
+_plot_kriged_data_outline      = plot_configuration.kriged_data_outline
 
 # marker_size = 3.5
 # marker_size = 1
@@ -125,6 +126,7 @@ if _plot_kriged:
             # m.scatter(kr.x,kr.y,c=kr.z
             #    m.scatter(kr.x,kr.y,c=np.log10(kr.z+1.0e-9)\
             if _plot_kriged_data:
+                # The target
                 m.scatter(kr.x,kr.y,c=vmap(kr.z)\
                           ,cmap=colormap_x\
                           ,linewidth=0\
@@ -135,6 +137,16 @@ if _plot_kriged:
                           ,s=marker_size*10\
                           ,marker='s'\
                 )
+                if _plot_kriged_data_outline:
+                    m.scatter(kr.x,kr.y
+                              ,linewidth=1\
+                              ,alpha=1.0\
+                              ,latlon=True\
+                              ,edgecolors=(0.8,0.8,1.0)\
+                              ,facecolor='none'\
+                              ,s=marker_size*10\
+                              ,marker='s'\
+                    )
                 
             if _plot_kriged_outline:
                 Krige.draw_screen_poly( kr.x[kr.hull.vertices], kr.y[kr.hull.vertices], m )
@@ -181,6 +193,15 @@ if _plot_kriged:
                                         ,cmap=colormap_x\
                                         ,marker_size=marker_size*10\
                                         ,value_map=vmap\
+                )
+                m.scatter(kr.src_x,kr.src_y\
+                          ,linewidth=0\
+                          ,alpha=1.0\
+                          ,latlon=True\
+                          ,edgecolors=(1.0,1.0,1.0)\
+                          ,facecolor='none'
+                          ,s=marker_size*10\
+                          ,marker='s'\
                 )
                 
                 

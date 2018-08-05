@@ -665,7 +665,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
         if lon_center is None:
             self.plot_lon_m_center = np.nanmean(self.longitude)
         else:
-            self.plot_lon_m_center = lon_cente
+            self.plot_lon_m_center = lon_center
 
         if wh_scale is None:
             self.m = Basemap(projection='cyl', resolution='l'\

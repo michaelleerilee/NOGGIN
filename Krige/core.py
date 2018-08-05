@@ -10,16 +10,20 @@ import Krige
 
 import os
 import sys
+
+import h5py
+import json
+# from math import *
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
-import numpy as np
 from mpl_toolkits.basemap import Basemap
+import numpy as np
+
 from pyhdf.SD import SD, SDC
-from math import *
 
 import pykrige
-from pykrige.ok import OrdinaryKriging
+from   pykrige.ok import OrdinaryKriging
 import pykrige.kriging_tools as kt
 import pykrige.core as core
 
@@ -27,8 +31,6 @@ from scipy.optimize import minimize
 from scipy.optimize import least_squares
 from scipy.spatial import ConvexHull
 
-import h5py
-import json
 
 import unittest
 
@@ -48,9 +50,11 @@ def log10_map(x,eps=1.0e-9,inverse=False):
 
 ###########################################################################
 
-rad_from_deg = pi/180.0
+rad_from_deg = np.pi/180.0
 
-def random_index(x0,y0,x,y,params,distribution='normal',l=-1,w=-1):
+def random_index(x0,y0,x,y,params,distribution='normal',l=-1,w=-1\
+                 ,lat_bounds=[]
+):
 
     # print 'random_index: x0,y0: '+str(x0)+', '+str(y0)\
     #    +' l,w: '+str(l)+', '+str(w)
@@ -65,7 +69,7 @@ def random_index(x0,y0,x,y,params,distribution='normal',l=-1,w=-1):
     
     if distribution == 'normal':
         sigma2=params*params
-        f = np.exp(-(np.power(xt,2)+np.power(yt,2))/(2.0*sigma2))/sqrt(2.0*pi*sigma2)
+        f = np.exp(-(np.power(xt,2)+np.power(yt,2))/(2.0*sigma2))/np.sqrt(2.0*np.pi*sigma2)
     elif distribution == 'exponential':
         f = np.exp(-np.sqrt(np.power(xt,2)+np.power(yt,2))/params)/params
     elif distribution == 'power-law':
@@ -79,25 +83,47 @@ def random_index(x0,y0,x,y,params,distribution='normal',l=-1,w=-1):
 
     if l > 0:
         f[np.where(((-l > xt)|(xt > l))|((-w > yt)|(yt > w)))] = 0.0
+
+    if lat_bounds != []:
+        f[np.where(((y < lat_bounds[0]) | (lat_bounds[1] < y)))] = 0.0
         
-        # f[np.where((-l < xt)&(xt < l)&(-w < yt)&(yt < w))] = 0.0
+    # f[np.where((-l < xt)&(xt < l)&(-w < yt)&(yt < w))] = 0.0
     
     return (f-np.random.uniform(0.0,1.0,f.shape)) > 0.0
 
-def adaptive_index(x0,y0,x,y,npts=100,beta0=200,frac=0.1,distribution='normal',l=-1,w=-1):
+def adaptive_index(x0,y0,x,y,npts=100,beta0=200,frac=0.1,distribution='normal',l=-1,w=-1\
+                   ,lat_bounds=[]\
+):
     idx_size = 0; idx = False
     beta=beta0
     iter=0
     idx = np.full(x.shape,False)
+    last_idx_size = 0
+    iter_since_last_change = 0
+    max_iter = 400
     while(True):
         iter=iter+1
-        idx = idx | random_index(x0,y0,x,y,beta,distribution,l=l,w=w)
+        idx = idx | random_index(x0,y0,x,y,beta,distribution,l=l,w=w,lat_bounds=lat_bounds)
         idx_size = idx[idx].size
+        delta_idx_size = idx_size - last_idx_size
+        if delta_idx_size == 0:
+            iter_since_last_change += 1
+        else:
+            iter_since_last_change  = 0
+        last_idx_size = idx_size
+        # print('adaptive_index iter= '+str(iter)\
+        #       +', idx_size= '+str(idx.size)\
+        #       +', idx_true_size= '+str(idx_size)\
+        #       +', iter_since_change= '+str(iter_since_last_change))
         if idx_size >= npts:
             break
+        elif iter_since_last_change > 2:
+            print('Krige.adaptive_index index size change rate too small. Breaking.')
+            break
         else:
+            # If 0 < frac < 1, beta decreases and the sampling dist. narrows.
             beta=beta*(1.0-frac)
-            if beta/beta0 < 0.00001 or iter > 1000:
+            if beta/beta0 < 0.00001 or iter > max_iter:
                 # fail not so silently
                 print 'Krige.adaptive_index Too many iterations, beta too small.'\
                     +' size='+str(idx_size)\
@@ -122,6 +148,7 @@ class krigePlotConfiguration(object):
                  ,kriged                  = True\
                  ,kriged_data             = True\
                  ,kriged_outline          = False\
+                 ,kriged_data_outline     = False\
                  ,source_data             = True\
                  ,source_data_last_sample = True\
                  ,variogram               = False\
@@ -139,6 +166,7 @@ class krigePlotConfiguration(object):
         self.kriged                  = kriged
         self.kriged_data             = kriged_data
         self.kriged_outline          = kriged_outline
+        self.kriged_data_outline     = kriged_data_outline
         self.source_data             = source_data
         self.source_data_last_sample = source_data_last_sample
         self.variogram               = variogram
@@ -542,7 +570,7 @@ def fit_variogram(x,y,z
 ):
     """Fit the variogram, based on code from PyKrige 1.4. Try to elide asap.
 """
-    print('fit_variogram')
+    print('fit_variogram using '+str(variogram_model)+' and '+coordinates_type)
     # Code assumes 1D input arrays. Ensures that any extraneous dimensions
     # don't get in the way. Copies are created to avoid any problems with
     # referencing the original passed arguments.
@@ -553,13 +581,18 @@ def fit_variogram(x,y,z
     self_YCENTER = (np.amax(self_Y_ORIG) + np.amin(self_Y_ORIG))/2.0
     
     if coordinates_type == 'euclidean':
-        raise NotImplementedError('coordinates_type euclidean NOT IMPLEMENTED.')
+        # raise NotImplementedError('coordinates_type euclidean NOT IMPLEMENTED.')
         self_anisotropy_scaling = anisotropy_scaling
         self_anisotropy_angle = anisotropy_angle
         #self_X_ADJUSTED, self_Y_ADJUSTED = \
         #                                   core.adjust_for_anisotropy(np.copy(self_X_ORIG), np.copy(self_Y_ORIG),
         #                                                              self_XCENTER, self_YCENTER,
         #                                                              self_anisotropy_scaling, self_anisotropy_angle)
+
+        ## mlr ## hack TODO fix the following.
+        self_X_ADJUSTED = self_X_ORIG
+        self_Y_ADJUSTED = self_Y_ORIG
+        
     elif coordinates_type == 'geographic':
         if anisotropy_scaling != 1.0:
             warnings.warn("Anisotropy is not compatible with geographic "
@@ -705,6 +738,7 @@ def drive_OKrige(
         ,verbose=False
         ,eps=1.0e-10
         ,backend='vectorized'
+        ,coordinates_type='geographic'
         ):
     """Krige from src_ arguments to x,y returning the kriged result gridz, gridss
 and the data_ and the variogram_parameters of the last sub-calculation.
@@ -724,37 +758,65 @@ and the data_ and the variogram_parameters of the last sub-calculation.
     if random_permute:
         ipermute = np.random.permutation(x.size)
     for i in range(0,x.size,grid_stride):
+
+        # Choose the portion of the target to compute in this iteration (i).
         if random_permute:
-            # Krig to a random permutation of the input positions
-            isample = ipermute[i:i+grid_stride]
+            # Krig to a random permutation of the target positions input
+            i_target_portion = ipermute[i:i+grid_stride]
         else:
             # Krig to a array-index-contiguous segment of the input positions
-            isample = range(i,min(i+grid_stride,x.size))
-        g_lon = x[isample]
-        g_lat = y[isample]
-        # l,w form a window from which to sample.
-        idx = adaptive_index(
-            center_array(g_lon)
-            ,center_array(g_lat)
-            ,src_x,src_y
-            ,npts=npts,beta0=beta0,frac=frac,l=l,w=w
-            ,distribution='normal')
+            i_target_portion = range(i,min(i+grid_stride,x.size))
+        g_lon = x[i_target_portion]
+        g_lat = y[i_target_portion]
+
+        # # Sample the source data.
+        # # l,w form a window from which to sample.
+        # src_idx = adaptive_index(
+        #     center_array(g_lon)
+        #     ,center_array(g_lat)
+        #     ,src_x,src_y
+        #     ,npts=min(npts,len(src_x)),beta0=beta0,frac=frac,l=l,w=w
+        #     ,distribution='normal'
+        # )
+
+        src_idx = np.full(src_x.shape,False)
+        stride = src_x.size/min(npts,src_x.size)
+        print('stride: ',stride)
+        for i in range(0,src_x.size,int(stride)):
+            src_idx[i] = True
+##mlr##
+#            ,lat_bounds=[-89.75,89.75]
+#            ,lat_bounds=[-89.99,89.99]
         print('processing '+str(i)\
                   +' of '+str(x.size)\
                   +',  '+str(int(100*float(i)/x.size))\
-                  +'% done, '+str(idx[idx].size))
-        data_x = src_x[idx];
+                  +'% done')
+        print('src_x.size:     '+str(src_x.size))
+        print('src_idx.size:   '+str(src_idx.size)+', valid: src_idx[src_idx].size= '+str(src_idx[src_idx].size))
+        
+        data_x         = src_x[src_idx];
+        print('data_x.size='+str(data_x.size))
         ## Adapt to geographic coordinates used by PyKrige
         data_x1        = np.copy(data_x)
-        idltz          = np.where(data_x < 0)
-        data_x1[idltz] = data_x1[idltz] + 360.0
-        data_y = src_y[idx]
-        data_z = src_z[idx]
-        if log_calc:
-            data_z1= np.log(data_z)
-        else:
-            data_z1= np.copy(data_z)
 
+        if coordinates_type == 'geographic':
+            idltz          = np.where(data_x < 0)
+            data_x1[idltz] = data_x1[idltz] + 360.0
+        
+        data_y         = src_y[src_idx]
+        data_z         = src_z[src_idx]
+        if log_calc:
+            data_z1    = np.log(data_z)
+        else:
+            data_z1    = np.copy(data_z)
+
+        print('dok: mnmx(data_z1): '+str((np.nanmin(data_z1),np.nanmax(data_z1))))
+            
+        ##mlr##
+        if coordinates_type == 'geographic':
+            g_lon_ltz = np.where(g_lon < 0)
+            g_lon[g_lon_ltz] = g_lon[g_lon_ltz] + 360.0
+            
         if calculate_parms:
             # Find parms
             lags,semivar,parms = fit_variogram(
@@ -764,17 +826,11 @@ and the data_ and the variogram_parameters of the last sub-calculation.
                 ,variogram_function=variogram_function
                 ,nlags=nlags
                 ,weight=weight
-                ,coordinates_type='geographic'
+                ,coordinates_type=coordinates_type
                 )
             print('parms: ',parms)
             variogram_parameters = list(parms)
 
-	    # OK = OrdinaryKriging( data_x1, data_y, data_z, variogram_model='exponential',
-	    # OK = OrdinaryKriging( data_x1, data_y, data_z, nlags=nlags\
-	    #                           ,variogram_model='exponential'\
-	    #                           ,enable_plotting=True\
-	    #                           )
-	    #                           ,enable_plotting=True
 	    OK = OrdinaryKriging(     data_x1, data_y, data_z1\
                                       ,variogram_model=variogram_model
                                       ,variogram_parameters=variogram_parameters
@@ -783,45 +839,21 @@ and the data_ and the variogram_parameters of the last sub-calculation.
                                       ,weight=weight
                                       ,enable_plotting=enable_plotting
                                       ,enable_statistics=enable_statistics
-                                      ,coordinates_type='geographic'
                                       ,verbose=verbose
+                                      ,coordinates_type=coordinates_type
                                       )
             
-            #                          ,eps=eps
-            # 0..360,-90..90
-            #,coordinates_type='geographic'
-            #,coordinates_type='euclidean'
-        
-        #                            ,nlags=nlags\
-        #                            ,variogram_model='custom'\
-        #                            ,variogram_function=custom_vg\
-        #                            ,variogram_parameters=custom_args\
-        #                            ,weight=True\
-        #                            )
-        #                          ,enable_plotting=True\
-        #                         ,variogram_model='exponential'\
-        #                         ,variogram_model='gaussian'\
-        # OK = OrdinaryKriging(     data_x1, data_y, data_z1\
-        #                           ,variogram_model='spherical'\
-        #                           ,nlags=nlags\
-        #                           ,enable_plotting=True\
-        #                           ,weight=True
-        #                           )
-	    z, ss = OK.execute('points',g_lon,g_lat\
-                               ,backend=backend\
-            )
-            #                   ,backend='vectorized'\
-            #                   ,backend='loop'\
-            #                   ,backend='C'\
-	    # gridz[i:i+grid_stride]  = np.exp(z[:])
-	    # gridss[i:i+grid_stride] = ss[:]
+	    z, ss = OK.execute('points',g_lon,g_lat,backend=backend)
+
             if verbose:
-                print('driveOKrige isample,mnmx(ln(z)): ',isample,np.nanmin(z),np.nanmax(z))
+                print('driveOKrige i_target_portion.size,mnmx(ln(z)): ',len(i_target_portion),np.nanmin(z),np.nanmax(z))
+                # print('driveOKrige i_target_portion,mnmx(ln(z)): ',i_target_portion,np.nanmin(z),np.nanmax(z))
             if log_calc:
-	        gridz [isample] = np.exp(z[:])
+	        gridz [i_target_portion] = np.exp(z[:])
             else:
-	        gridz [isample] = z[:]
-	    gridss[isample] = ss[:]
+	        gridz [i_target_portion] = z[:]
+	    gridss[i_target_portion] = ss[:]
+
     # TODO Need to return gridss
     print 1000
     config = krigeConfig(\
@@ -836,7 +868,7 @@ and the data_ and the variogram_parameters of the last sub-calculation.
                          ,parameters           = variogram_parameters\
                          ,grid_stride          = grid_stride\
                          ,random_permute       = random_permute\
-                         ,coordinates_type     = 'geographic'\
+                         ,coordinates_type     = coordinates_type\
     )
     return krigeResults(s              = gridss\
                         ,z             = gridz\
