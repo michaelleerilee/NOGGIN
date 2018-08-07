@@ -75,9 +75,9 @@ SRC_DIRECTORY_BASE=df.data_src_directory()
 ##
 ##
 
-# _DailyLoad_Case = 'MODIS-Water_Vapor_Mean-Case-1'
+_DailyLoad_Case = 'MODIS-Water_Vapor_Mean-Case-1'
 # _DailyLoad_Case = 'MODIS-Total_Ozone_Burden-Case-1'
-_DailyLoad_Case = 'OMI-Total_Ozone-Case-1'
+# _DailyLoad_Case = 'OMI-Total_Ozone-Case-1'
 
 ###########################################################################
 ##
@@ -127,9 +127,10 @@ if _DailyLoad_Case == 'MODIS-Total_Ozone_Burden-Case-1':
     _datafield = 'Total_Ozone_Mean'
     vmin=1.5; vmax=2.75
     npts = 2000
-    _variogram_model = 'linear_variogram_model'
-    # _variogram_model = 'gamma_rayleigh_nuggetless_variogram_model'
+    # _variogram_model = 'linear_variogram_model'
+    _variogram_model = 'gamma_rayleigh_nuggetless_variogram_model'
     _drive_OKrige_plot_variogram      = True
+    _drive_OKrige_verbose             = True
     
     SRC_DIRECTORY=SRC_DIRECTORY_BASE+'MODIS-61/'
     #  MYD08_D3.A2015304.006.2015305223906.hdf

@@ -334,7 +334,8 @@ class krigeHDF(object):
                  ,orig_units='kr_units'\
                  ,output_filename ='krigeHDF-test.hdf'\
                  ,config = None\
-                 ,redimension = True\
+                 ,redimension = False\
+                 ,type_hint   = 'swath'\
                  ):
         """Support saving krige results in an HDF (EOS) compatible way, so that tools like Panoply might be used.
 
@@ -364,43 +365,53 @@ The shape of the orig_? arrays is used to format the datasets written to output 
         self.orig_units      = orig_units
         self.output_filename = output_filename
         self.config          = config
+        self.type_hint       = type_hint
 
-        if (self.orig_z is None):
-            #  or (self.krg_z is None):
-            orig_and_krg = None
-        else:
-            orig_and_krg = np.zeros(self.orig_x.shape)
-        if self.krg_z is not None:
-            krg = np.zeros(self.orig_x.shape)
-            krg[:,:] = np.nan
-        else:
-            krg = None
-        if self.krg_s is not None:
-            s = np.zeros(self.orig_x.shape)
-            s[:,:] = np.nan
-        else:
-            s = None
-        if self.orig_z is not None:
-            orig_and_krg[:,:] = self.orig_z
 
-        if redimension:
-            if (self.krg_x is not None) and (self.orig_x is not None):
-                for i in range(len(self.krg_x)):
-                    x = self.krg_x[i]
-                    y = self.krg_y[i]
-                    idx = np.where( (self.orig_x == x) & (self.orig_y == y) )
-                    # If len(idx) != 2 error.
-                    orig_and_krg[idx[0],idx[1]] = self.krg_z[i]
-                    krg[idx[0],idx[1]] = self.krg_z[i]
-                    s  [idx[0],idx[1]] = self.krg_s[i]
-        else:
-            x = self.krg_x
-            y = self.krg_y
-            idx = np.where( orig_and_krg == np.nan )
-            # TODO check to see if krg_z and orig_z have the same shape
-            orig_and_krg[idx] = self.krg_z[idx]
-            krg = self.krg_z
-            s   = self.krg_s
+        if (type_hint=='grid') and (redimension==True):
+            raise ValueError('type_hint=grid incompatible with redimension==True')
+        
+        # if self.type_hint == 'grid':
+        # elif self.type_hint == 'swath':
+        if True:
+            if (self.orig_z is None):
+                #  or (self.krg_z is None):
+                orig_and_krg = None
+            else:
+                orig_and_krg = np.zeros(self.orig_z.shape)
+            if self.krg_z is not None:
+                krg = np.zeros(self.krg_z.shape)
+                krg[:,:] = np.nan
+            else:
+                krg = None
+            if self.krg_s is not None:
+                s = np.zeros(self.krg_s.shape)
+                s[:,:] = np.nan
+            else:
+                s = None
+            if self.orig_z is not None:
+                orig_and_krg[:,:] = self.orig_z
+
+        if True:
+            if redimension:
+                if (self.krg_x is not None) and (self.orig_x is not None):
+                    for i in range(len(self.krg_x)):
+                        x = self.krg_x[i]
+                        y = self.krg_y[i]
+                        idx = np.where( (self.orig_x == x) & (self.orig_y == y) )
+                        # If len(idx) != 2 error.
+                        orig_and_krg[idx[0],idx[1]] = self.krg_z[i]
+                        krg[idx[0],idx[1]] = self.krg_z[i]
+                        s  [idx[0],idx[1]] = self.krg_s[i]
+            else:
+                x = self.krg_x
+                y = self.krg_y
+                idx = np.where( orig_and_krg == np.nan )
+                # TODO check to see if krg_z and orig_z have the same shape
+                orig_and_krg[idx] = self.krg_z[idx]
+                krg = self.krg_z
+                s   = self.krg_s
+            
                 
                     
         self.x2 = self.orig_x
@@ -409,9 +420,178 @@ The shape of the orig_? arrays is used to format the datasets written to output 
         self.orig_and_krg = orig_and_krg
         self.krg = krg
         self.s   = s
-        
+
     def save(self):
-        """Save the krige, source, and krige+source data to a file. Should figure out a way to control the format of the file and provide information about the 'grid.' This is necessary if we want the krige output to be compatible with NOGGIn regridding."""
+        """Save the krige, source, and krige+source data to a file. The argument type_hint determines how the data is to be saved.
+
+type_hint == 'swath' => Save data as a fake swath.
+
+type_hint == 'grid'  => Try to reinterpret the POINT (irregular) data grid type as a rectangular grid and save it to HDF as a grid."""
+        if self.type_hint == 'swath':
+            self.save_swath()
+        elif self.type_hint == 'grid':
+            self.save_grid()
+        else:
+            print('krigeHDF.save type_hint=="'+str(type_hint)+'" not understood. Returning')
+
+    def save_grid(self):
+        # print '!!!krigeHDF.save_grid NOT IMPLEMENTED!!!'
+        # return
+
+        with h5py.File(self.output_filename,'w') as f:
+            ny = self.y2.size
+            nx = self.x2.size
+
+            # TODO: Check that data geometry is GRID
+
+            # Group: /HDFEOS
+            grp_1 = f.create_group('HDFEOS')
+        
+        
+            # Group: /HDFEOS/NOGGIN
+            grp_2 = grp_1.create_group('NOGGIN')
+        
+        
+            # Group: /HDFEOS/NOGGIN/KrigeResult2
+            grp_3 = grp_2.create_group('KrigeResult2')
+        
+        
+            # Group: /HDFEOS/NOGGIN/KrigeResult2/Data Fields
+            grp_4 = grp_3.create_group('Data Fields')
+            
+            # Dataset: /HDFEOS/NOGGIN/KrigeResult2/Data Fields/latitude
+            dt = np.dtype('<f4')
+            dset = grp_4.create_dataset('latitude', (ny,), maxshape=(ny,), dtype=dt)
+            # initialize dataset values here
+            # TODO: Lot's of assumptions here
+            dset[:] = self.y2[:]
+            dset.attrs['units'] = 'degrees_north'
+            dset.attrs['_CoordinateAxisType'] = "Lat"
+            
+            # Dataset: /HDFEOS/NOGGIN/KrigeResult2/Data Fields/longitude
+            dt = np.dtype('<f4')
+            dset = grp_4.create_dataset('longitude', (nx,), maxshape=(nx,), dtype=dt)
+            # initialize dataset values here
+            # TODO: Lot's of assumptions here
+            dset[:] = self.x2[:]
+            dset.attrs['units'] = 'degrees_east'
+            dset.attrs['_CoordinateAxisType'] = "Lon"
+            
+            # Dataset: /HDFEOS/NOGGIN/KrigeResult2/Data Fields/time
+            dt = np.dtype('<f4')
+            dset = grp_4.create_dataset('time', (1,), maxshape=(1,), dtype=dt)
+            # initialize dataset values here
+            dset[:] = 0.0
+            dset.attrs['units'] = "seconds since 1993-01-01 00:00:00.000000Z"            
+            dset.attrs['_CoordinateAxisType'] = "Time"
+            
+            datafields_base='/HDFEOS/NOGGIN/KrigeResult2/Data Fields/'
+            datafields_added = []
+
+            if self.orig_and_krg is not None:
+                # Dataset
+                dt = np.dtype('<f8')
+                variable_name = self.orig_name.split('/')[-1]+'_orig_and_krg'
+                dset = grp_4.create_dataset(variable_name, (ny,nx), maxshape=(ny,nx), dtype=dt)
+                # initialize dataset values here
+                dset[:,:] = self.orig_and_krg
+                # Creating attributes 
+                dset.attrs['units'] = self.krg_units
+                dset.attrs['coordinates'] = "latitude longitude"
+                dset.attrs['source_variable'] = self.orig_name
+                datafields_added.append(datafields_base+variable_name)
+
+            if self.orig_z is not None:
+                dt = np.dtype('<f8')
+                variable_name = self.orig_name.split('/')[-1]+'_orig'
+                dset = grp_4.create_dataset(variable_name, (ny,nx), maxshape=(ny,nx), dtype=dt)
+                # initialize dataset values here
+                dset[:,:] = self.orig_z
+                # Creating attributes for /HDFEOS/NOGGIN/KrigeResult1/Data Fields/temperature
+                dset.attrs['units'] = self.orig_units
+                dset.attrs['coordinates'] = "latitude longitude"
+                dset.attrs['source_variable'] = self.orig_name
+                datafields_added.append(datafields_base+variable_name)
+
+            if self.krg is not None:
+                variable_name = self.orig_name.split('/')[-1]+'_krg'
+                dset = grp_4.create_dataset(variable_name, (ny,nx), maxshape=(ny,nx), dtype=dt)
+                # initialize dataset values here
+                dset[:,:] = self.krg
+                # Creating attributes
+                dset.attrs['units'] = self.krg_units
+                dset.attrs['coordinates'] = "latitude longitude"
+                dset.attrs['source_variable'] = self.orig_name
+                datafields_added.append(datafields_base+variable_name)
+
+            if self.config is not None:
+                if self.s is not None:
+                    variable_name = self.orig_name.split('/')[-1]+"_uncertainty"
+                    dset = grp_4.create_dataset(variable_name, (ny,nx), maxshape=(ny,nx), dtype=dt)
+                    # initialize dataset values here
+                    if self.config.log_calc:
+                        dset[:,:] = np.sqrt(self.s)
+                    else:
+                        dset[:,:] = np.exp(np.sqrt(self.s))
+                    # Creating attributes
+                    dset.attrs['units'] = self.krg_units
+                    dset.attrs['coordinates'] = "latitude longitude"
+                    dset.attrs['source_variable'] = self.orig_name
+                    datafields_added.append(datafields_base+variable_name)
+                    
+                    if (self.s is not None) and (self.krg is not None):
+                        variable_name = self.orig_name.split('/')[-1]+"_relative_uncertainty"
+                        dset = grp_4.create_dataset(variable_name, (ny,nx), maxshape=(ny,nx), dtype=dt)
+                        # initialize dataset values here
+                        tmp = np.zeros(self.s.shape)
+                        if self.config.log_calc:
+                            tmp[:,:] = np.exp(np.sqrt(self.s))/self.krg
+                        else:
+                            tmp[:,:] = np.sqrt(self.s)/self.krg
+                        tmp[np.where(tmp == np.inf)] = np.nan
+                        dset[:,:] = tmp 
+                        # Creating attributes
+                        dset.attrs['units'] = 'dimensionless'
+                        dset.attrs['coordinates'] = "latitude longitude"
+                        dset.attrs['source_variable'] = self.orig_name
+                        datafields_added.append(datafields_base+variable_name)
+
+            
+            # Group: /HDFEOS INFORMATION
+            grp_1 = f.create_group('HDFEOS INFORMATION')
+            
+            # Dataset: /HDFEOS INFORMATION/StructMetadata.0
+            dt = np.dtype('S1')
+            dset = grp_1.create_dataset('StructMetadata.0', (), dtype=dt)
+            # initialize dataset values here
+
+            #
+            # Adding dimensions
+            #
+            
+            # Creating dimension scales
+            h5py.h5ds.set_scale(f['/HDFEOS/NOGGIN/KrigeResult2/Data Fields/latitude'].id)
+            h5py.h5ds.set_scale(f['/HDFEOS/NOGGIN/KrigeResult2/Data Fields/longitude'].id)
+            h5py.h5ds.set_scale(f['/HDFEOS/NOGGIN/KrigeResult2/Data Fields/time'].id)
+
+            # print('f: keys: '+str(f.keys()))
+            # print('f: keys: '+str(f['/HDFEOS'].keys()))
+            # print('f: keys: '+str(f['/HDFEOS/KrigeResult2'].keys()))
+            # print('f: keys: '+str(f['/HDFEOS/KrigeResult2/Data Fields'].keys()))
+            # 
+            # tmp0 = f['/HDFEOS/NOGGIN/KrigeResult2/Data Fields']
+            # tmp1 = f['/HDFEOS/NOGGIN/KrigeResult2/Data Fields/latitude']
+            
+            # Attaching dimension scales to dataset: /HDFEOS/NOGGIN/KrigeResult2/Data Fields/...
+            for df in datafields_added:
+                f[df].dims[0].attach_scale(f['/HDFEOS/NOGGIN/KrigeResult2/Data Fields/latitude'])
+                f[df].dims[1].attach_scale(f['/HDFEOS/NOGGIN/KrigeResult2/Data Fields/longitude'])
+                
+            # Close the file (Not needed with 'with')
+            # f.close()
+        
+    def save_swath(self):
+        """Save the krige, source, and krige+source data to a file. This fakes a 'swath' format, but misses some subtleties, as it is actually an irregular grid and not a swath. Seems to work for data that is actually a grid. Should figure out a way to control the format of the file and provide information about the 'grid.' This is necessary if we want the krige output to be compatible with NOGGIn regridding."""
         with h5py.File(self.output_filename,'w') as f:
 
             nx,ny = self.x2.shape
@@ -671,6 +851,7 @@ class krigeConfig(object):
                  ,random_permute       = None\
                  ,coordinates_type     = None\
                  ,sampling             = None\
+                 ,log_calc             = None\
     ):
         self.noggin_krige_version = Krige.__version__
         self.pykrige_version      = pykrige.__version__
@@ -687,6 +868,7 @@ class krigeConfig(object):
         self.random_permute       = random_permute
         self.coordinates_type     = coordinates_type
         self.sampling             = sampling
+        self.log_calc             = log_calc
     def as_dict(self):
         return \
             {\
@@ -713,6 +895,7 @@ class krigeConfig(object):
              {\
               'grid_stride'     : self.grid_stride\
               ,'random_permute' : self.random_permute\
+              ,'log_calc'       : self.log_calc\
               }}
     def as_json(self):
         return json.dumps(self.as_dict())
@@ -751,6 +934,8 @@ def drive_OKrige(
 and the data_ and the variogram_parameters of the last sub-calculation.
 
 'Geographic' (lon-lat) coordinate type is assumed.
+
+The error estimate 'ss' is returned without modification from the OK calculation. Check log_calc to determine if one should form np.exp(np.sqrt(ss)) to get the correct values & units.
 
 """
     if variogram_parameters is None:
@@ -822,7 +1007,7 @@ and the data_ and the variogram_parameters of the last sub-calculation.
         
         data_x         = src_x[src_idx];
         if verbose:
-            print('dok: data_x.size='+str(data_x.size))
+            print('dok: data_x.size='+str(data_x.size)+', log_calc= '+str(log_calc))
         ## Adapt to geographic coordinates used by PyKrige
         data_x1        = np.copy(data_x)
 
@@ -900,6 +1085,7 @@ and the data_ and the variogram_parameters of the last sub-calculation.
                          ,grid_stride          = grid_stride\
                          ,random_permute       = random_permute\
                          ,coordinates_type     = coordinates_type\
+                         ,log_calc             = log_calc\
     )
     return krigeResults(s              = gridss\
                         ,z             = gridz\
@@ -911,12 +1097,13 @@ and the data_ and the variogram_parameters of the last sub-calculation.
                         ,vg_function   = variogram_function\
                         ,vg_parameters = variogram_parameters\
                         ,config        = config\
+                        ,log_calc      = log_calc\
                         )
     # return gridz, data_x, data_y, data_z, variogram_parameters
     
 ####
 
-class rectangular_grid():
+class rectangular_grid(object):
     x0 = -180.0
     x1 =  180.0
     dx =    1.0
@@ -942,12 +1129,14 @@ class rectangular_grid():
         self.y1 = y1
         self.dy = dy
 
-        self.xy = np.meshgrid(     np.arange(self.x0,self.x1,self.dx)\
-                                  ,np.arange(self.y0,self.y1,self.dy))
+        self.x1d = np.arange(self.x0,self.x1,self.dx)
+        self.y1d = np.arange(self.y0,self.y1,self.dy)
+
+        self.xy = np.meshgrid( self.x1d, self.y1d )
+
         # xy = np.meshgrid(np.arange(-120.0,-105.0,0.25),np.arange(  20.0,  25.0,0.25))
         self.x = np.ravel(self.xy[0])
         self.y = np.ravel(self.xy[1])
-
     
     def in_grid(self,longitude,latitude):
         return \
@@ -962,10 +1151,13 @@ class rectangular_grid():
 
     def gridxy(self):
         return self.x,self.y
-          
+
+    def gridxy1d(self):
+        return self.x1d,self.y1d
+    
 ####
 
-class fig_generator():
+class fig_generator(object):
     iSubplot       = -1
     irowSubplots   = -1
     icolSubplots   = -1

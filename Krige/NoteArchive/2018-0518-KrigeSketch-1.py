@@ -161,7 +161,9 @@ for i,v in boxes_json.iteritems():
 #
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 
+## TODO: Should we have boxes and tiles in the same structure?
 targetBoxes=[]
+targetTiles=[]
 krigeSketch_results = []
 hires_calc = []
 
@@ -240,7 +242,8 @@ k = -1
 dLon = 120
 dLat = 10
 dSearch = 0.75*dLon
-lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  90-dLat
+# Full lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  90-dLat
+# 4-box test
 lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  -60-dLat
 # lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 = -60-dLat
 lores_npts = 2000
@@ -280,16 +283,76 @@ targetBoxes.append(cap_north)
 # lores_npts = 2000
 # hires_npts = 4000
 
+###########################################################################
+# Add the other boxes.
 for iLon in range(lon0,lon1,dLon):
     for jLat in range(lat0,lat1,dLat):
         krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
                                     ,df.Point((iLon+dLon, jLat+dLat))))
         targetBoxes.append(krigeBox)
 
+###########################################################################
+
+
+# Now we have boxes. Including the caps.
+
+# Construct the target grid from targetBoxes.
+# Make a bounding box covering everything, and then grid that at a given resolution.
+
+cover = df.BoundingBox()
+for box in targetBoxes:
+    cover = cover.union(box)
+tgt_lons,tgt_lats = cover.lons_lats()
+tgt_grid_dLon = 0.5
+tgt_grid_dLat = 0.5
+tgt_grid_full = Krige.rectangular_grid(\
+                                       x0 = tgt_lons[0]\
+                                       ,x1 = tgt_lons[1]\
+                                       ,dx = tgt_grid_dLon\
+                                       ,y0 = tgt_lats[0]\
+                                       ,y1 = tgt_lats[1]\
+                                       ,dy = tgt_grid_dLat\
+                                       )
+
+tgt_X1d,tgt_Y1d = tgt_grid_full.gridxy1d()
+
+tgt_lon0 = np.nanmin(tgt_X1d)
+tgt_lon1 = np.nanmax(tgt_X1d)
+tgt_lat0 = np.nanmin(tgt_Y1d)
+tgt_lat1 = np.nanmax(tgt_Y1d)
+
+nx = (tgt_lon1-tgt_lon0)/tgt_grid_dLon
+ny = (tgt_lat1-tgt_lat0)/tgt_grid_dLat
+if np.abs(nx - int(nx)) > 1.0e-10:
+    print('Error: grid_dLon does not evenly divide longitude span.')
+if np.abs(ny - int(ny)) > 1.0e-10:
+    print('Error: grid_dLat does not evenly divide latitude span.')
+
+###########################################################################
+
+# Construct individual tiles. Hope they line up with tgt_grid_full.
+for krigeBox in targetBoxes:
+    tile_lons,tile_lats = krigeBox.lons_lats()
+    tile = Krige.rectangular_grid(\
+                                  x0 = tile_lons[0]\
+                                  ,x1 = tile_lons[1]\
+                                  ,dx = tgt_grid_dLon\
+                                  ,y0 = tile_lats[0]\
+                                  ,y1 = tile_lats[1]\
+                                  ,dy = tgt_grid_dLat\
+    )
+    targetTiles.append(tile)
+
+###########################################################################
+    
+    
+### TODO: Verify the size of tgt_?1d match the calculated result.
+    
 k=-1
 for krigeBox in targetBoxes:
     for dummy in [1]:
         k=k+1
+        grid = targetTiles[k]
         _calculate = False
         _enable_statistics = _drive_OKrige_enable_statistics
         if not _capture_only:
@@ -375,18 +438,20 @@ for krigeBox in targetBoxes:
             # modis_obj_1.scatterplot(vmin=1.0,vmax=4.0,title='scatter')
             # modis_obj_1.colormesh(vmin=1.0,vmax=3.0,title='scatter')
             
-            # Construct the target grid and related arrays for the kriging
-            kb_lons,kb_lats = krigeBox.lons_lats()
-            kb_dx = 0.5
-            kb_dy = 0.5
-            grid = Krige.rectangular_grid(\
-                                           x0  = kb_lons[0]\
-                                           ,x1 = kb_lons[1]\
-                                           ,dx = kb_dx\
-                                           ,y0 = kb_lats[0]\
-                                           ,y1 = kb_lats[1]\
-                                           ,dy = kb_dy\
-            )
+            #### # Construct the target grid and related arrays for the kriging
+            #### kb_lons,kb_lats = krigeBox.lons_lats()
+            #### kb_dx = 0.5
+            #### kb_dy = 0.5
+            #### grid = Krige.rectangular_grid(\
+            ####                                x0  = kb_lons[0]\
+            ####                                ,x1 = kb_lons[1]\
+            ####                                ,dx = kb_dx\
+            ####                                ,y0 = kb_lats[0]\
+            ####                                ,y1 = kb_lats[1]\
+            ####                                ,dy = kb_dy\
+            #### )
+
+            #### See start of loop... grid = targetTiles[k]
             gridx,gridy = grid.gridxy()
             in_grid = grid.in_grid(longitude1,latitude1)
             ex_grid = grid.ex_grid(longitude1,latitude1)
@@ -396,22 +461,21 @@ for krigeBox in targetBoxes:
             # Calculate variogram
     
             nlags=_drive_OKrige_nlags
-            custom_args = None
-    
-            # A gamma-rayleigh distribution
-            def custom_vg(params,dist):
-                sill    = np.float(params[0])
-                falloff = np.float(params[1])
-                beta    = np.float(params[2])
-                fd      = falloff*dist
-                omfd    = 1.0-falloff*dist
-                bfd2    = beta*omfd*omfd
-                return \
-                    sill*fd*np.exp(omfd-bfd2)
+            ### custom_args = None
+            ### 
+            ### # A gamma-rayleigh distribution
+            ### def custom_vg(params,dist):
+            ###     sill    = np.float(params[0])
+            ###     falloff = np.float(params[1])
+            ###     beta    = np.float(params[2])
+            ###     fd      = falloff*dist
+            ###     omfd    = 1.0-falloff*dist
+            ###     bfd2    = beta*omfd*omfd
+            ###     return \
+            ###         sill*fd*np.exp(omfd-bfd2)
     
             #
-            dg=gridx.size
-    
+            dg = gridx.size
             dx = Krige.span_array(gridx)
             dy = Krige.span_array(gridy)
             dr = math.sqrt(dx*dx+dy*dy)
@@ -520,7 +584,10 @@ for krigeBox in targetBoxes:
                 if (max_iter < 1) or ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
                     if (max_iter < 1):
                         print '**'
-                        print '*** kriging diverged, max_iter exceeded, continuing to next tile'
+                        print '*** max_iter exceeded, continuing to next tile'
+                    if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
+                        print '**'
+                        print '*** kriging seems to have converged'
                     break
                 else:
                     print '***'
@@ -601,26 +668,39 @@ plot_configuration = Krige.krigePlotConfiguration(source_data              = Fal
 # Save an HDF file
 # TODO The following is currently broken
 # TODO Apparently SWATH does not mean irregular.
-if False:
-    n_across = len(krigeSketch_results[-1].x)
-    n_along  = 0
-    for kr in krigeSketch_results:
-        n_along = n_along + len(kr.x)/n_across
-    x = np.zeros((n_along,n_across)); x.fill(np.nan)
-    y = np.zeros((n_along,n_across)); y.fill(np.nan)
-    z = np.zeros((n_along,n_across)); z.fill(np.nan)
-    s = np.zeros((n_along,n_across)); s.fill(np.nan)
-    nans = np.zeros((n_along,n_across)); nans.fill(np.nan)
+if True:
 
+    # Now, we use tgt_X1d and tgt_Y1d
+    ny = tgt_Y1d.size
+    nx = tgt_X1d.size
+
+    # The following, no.
+    x    = np.zeros((ny,nx)); x.fill(np.nan)
+    y    = np.zeros((ny,nx)); y.fill(np.nan)
+
+    # Yes, the following.
+    z    = np.zeros((ny,nx)); z.fill(np.nan)
+    s    = np.zeros((ny,nx)); s.fill(np.nan)
+    nans = np.zeros((ny,nx)); nans.fill(np.nan)
+
+    # The following is incorrect.
     i=0
     for kr in krigeSketch_results:
-        for j in range(len(kr.x)/n_across):
-            x[i,:] = kr.x[j*n_across:(j+1)*n_across]
-            y[i,:] = kr.y[j*n_across:(j+1)*n_across]
-            z[i,:] = kr.z[j*n_across:(j+1)*n_across]
-            s[i,:] = kr.s[j*n_across:(j+1)*n_across]
-            i = i + 1
-                                                   
+        for k in range(kr.x.size):
+            tgt_x_idx = np.where(tgt_X1d == kr.x[k])
+            tgt_y_idx = np.where(tgt_Y1d == kr.y[k])
+
+            if (len(tgt_x_idx) != 1) or (len(tgt_y_idx) != 1):
+                print('*** tgt_?_idx error. ')
+                print('*** tgt_x_idx = '+str(tgt_x_idx))
+                print('*** tgt_y_idx = '+str(tgt_y_idx))
+                print('*** skipping')
+            else:
+                x[tgt_y_idx[0],tgt_x_idx[0]] = kr.x[k]
+                y[tgt_y_idx[0],tgt_x_idx[0]] = kr.y[k]
+                z[tgt_y_idx[0],tgt_x_idx[0]] = kr.z[k]
+                s[tgt_y_idx[0],tgt_x_idx[0]] = kr.s[k]
+        
     variable_name   = krigeSketch_results[-1].zVariableName
     output_filename = "KrigeSketch_"+modis_obj.datafilename+".hdf"
     if '.hdf.hdf' in output_filename[-8:]:
@@ -632,15 +712,16 @@ if False:
                           ,config                  = krigeSketch_results[-1].config\
                           ,krg_z                   = z
                           ,krg_s                   = s
-                          ,krg_x                   = x
-                          ,krg_y                   = y
+                          ,krg_x                   = tgt_X1d
+                          ,krg_y                   = tgt_Y1d
                           ,orig_name               = modis_obj.datafieldname\
                           ,orig_units              = modis_obj.units\
                           ,orig_z                  = nans
-                          ,orig_x                  = x
-                          ,orig_y                  = y
+                          ,orig_x                  = tgt_X1d
+                          ,orig_y                  = tgt_Y1d
                           ,output_filename         = output_filename\
                           ,redimension             = False\
+                          ,type_hint               = 'grid'\
     )
     kHDF.save()
 
