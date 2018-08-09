@@ -161,7 +161,8 @@ class krigePlotConfiguration(object):
                  ,vmax                    = 1.25\
                  ,vmap                    = None\
                  ,title                   = 'title'\
-                 ,zVariableName           = 'z'
+                 ,zVariableName           = 'z'\
+                 ,meridians_and_parallels = False\
                  ):
         self.kriged                  = kriged
         self.kriged_data             = kriged_data
@@ -365,6 +366,7 @@ The shape of the orig_? arrays is used to format the datasets written to output 
         self.orig_units      = orig_units
         self.output_filename = output_filename
         self.config          = config
+        self.redimension     = redimension
         self.type_hint       = type_hint
 
 
@@ -373,6 +375,8 @@ The shape of the orig_? arrays is used to format the datasets written to output 
         
         # if self.type_hint == 'grid':
         # elif self.type_hint == 'swath':
+
+        # Some of the following code is set up to ease "gap filling".
         if True:
             if (self.orig_z is None):
                 #  or (self.krg_z is None):
@@ -406,18 +410,21 @@ The shape of the orig_? arrays is used to format the datasets written to output 
             else:
                 x = self.krg_x
                 y = self.krg_y
-                idx = np.where( orig_and_krg == np.nan )
-                # TODO check to see if krg_z and orig_z have the same shape
-                orig_and_krg[idx] = self.krg_z[idx]
                 krg = self.krg_z
                 s   = self.krg_s
-            
                 
-                    
+                if orig_and_krg is not None:
+                    idx = np.where( orig_and_krg == np.nan )
+                    # TODO check to see if krg_z and orig_z have the same shape
+                    orig_and_krg[idx] = self.krg_z[idx]
+
+        # For orig.
         self.x2 = self.orig_x
         self.y2 = self.orig_y
         self.z2 = orig_and_krg
         self.orig_and_krg = orig_and_krg
+
+        # For krg, krg_x, krg_y, krg_s...
         self.krg = krg
         self.s   = s
 
@@ -439,8 +446,8 @@ type_hint == 'grid'  => Try to reinterpret the POINT (irregular) data grid type 
         # return
 
         with h5py.File(self.output_filename,'w') as f:
-            ny = self.y2.size
-            nx = self.x2.size
+            ny = self.krg_y.size
+            nx = self.krg_x.size
 
             # TODO: Check that data geometry is GRID
 
@@ -464,7 +471,7 @@ type_hint == 'grid'  => Try to reinterpret the POINT (irregular) data grid type 
             dset = grp_4.create_dataset('latitude', (ny,), maxshape=(ny,), dtype=dt)
             # initialize dataset values here
             # TODO: Lot's of assumptions here
-            dset[:] = self.y2[:]
+            dset[:] = self.krg_y[:]
             dset.attrs['units'] = 'degrees_north'
             dset.attrs['_CoordinateAxisType'] = "Lat"
             
@@ -473,7 +480,7 @@ type_hint == 'grid'  => Try to reinterpret the POINT (irregular) data grid type 
             dset = grp_4.create_dataset('longitude', (nx,), maxshape=(nx,), dtype=dt)
             # initialize dataset values here
             # TODO: Lot's of assumptions here
-            dset[:] = self.x2[:]
+            dset[:] = self.krg_x[:]
             dset.attrs['units'] = 'degrees_east'
             dset.attrs['_CoordinateAxisType'] = "Lon"
             
@@ -530,9 +537,9 @@ type_hint == 'grid'  => Try to reinterpret the POINT (irregular) data grid type 
                     dset = grp_4.create_dataset(variable_name, (ny,nx), maxshape=(ny,nx), dtype=dt)
                     # initialize dataset values here
                     if self.config.log_calc:
-                        dset[:,:] = np.sqrt(self.s)
-                    else:
                         dset[:,:] = np.exp(np.sqrt(self.s))
+                    else:
+                        dset[:,:] = np.sqrt(self.s)
                     # Creating attributes
                     dset.attrs['units'] = self.krg_units
                     dset.attrs['coordinates'] = "latitude longitude"

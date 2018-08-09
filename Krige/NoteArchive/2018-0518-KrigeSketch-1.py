@@ -57,6 +57,7 @@ _plot_source_data_outside_grid = False
 _plot_kriged                   = True
 _plot_kriged_outline           = True
 _plot_variogram                = False
+_plot_meridians_and_parallels   = False
 
 _capture_only      = False
 _capture_k         = 17
@@ -167,6 +168,15 @@ targetTiles=[]
 krigeSketch_results = []
 hires_calc = []
 
+# npts_adapt_flag    = True # 
+npts_increase_flag = True
+# npts_last_kr_s = 0
+max_iter_start = 5
+
+divergence_threshold = 1.5
+npts_increase_factor = 1.5
+npts_decrease_factor = 0.75
+
 # loading_buffer = 5 # for adding some margin to ensure good coverage
 dLon = 30
 dLat = 30
@@ -242,18 +252,22 @@ k = -1
 dLon = 120
 dLat = 10
 dSearch = 0.75*dLon
-# Full lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  90-dLat
-# 4-box test
-lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  -60-dLat
+# Full
+lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  90-dLat
+# 4-box test lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  -60-dLat
 # lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 = -60-dLat
-lores_npts = 2000
-hires_npts = 4000
+# lores_npts = 2000
+# lores_npts = 3000
+lores_npts = 3500
+hires_npts = lores_npts * 2
+# hires_npts = 4000
 # hires_calc = [5,11,37,48,60,61,63,67,68]
 # hires_calc = [0,1]
 # hires_calc = [0,1]
 hires_calc = []
 divergence_threshold = 1.5
 npts_increase_factor = 1.5
+npts_decrease_factor = 0.75
 
 cap_south = df.BoundingBox((df.Point((-180, -90))\
                              ,df.Point((180, -90+dLat))))
@@ -303,6 +317,7 @@ cover = df.BoundingBox()
 for box in targetBoxes:
     cover = cover.union(box)
 tgt_lons,tgt_lats = cover.lons_lats()
+print('noggin_krige: tgt lons,lats: '+str(tgt_lons)+', '+str(tgt_lats))
 tgt_grid_dLon = 0.5
 tgt_grid_dLat = 0.5
 tgt_grid_full = Krige.rectangular_grid(\
@@ -398,17 +413,18 @@ for krigeBox in targetBoxes:
                             for kb in o:
                                 if not kb.emptyp():
                                     # print 'adding '+i+' : '+str(v.lons_lats())
-                                    src_data[i] = v
-                                    # load the data
-                                    print 'loading '+i+' from '+SRC_DIRECTORY
-                                    # print 'type(i): '+str(type(i))
-                                    modis_obj = df.DataField(\
-                                                                    datafilename=i\
-                                                                    ,datafieldname='Water_Vapor_Infrared'\
-                                                                    ,srcdirname=SRC_DIRECTORY\
-                                                                    ,hack_branchcut_threshold=200\
-                                    )
-                                    modis_objs.append(modis_obj)
+                                    if v not in src_data.values():
+                                        src_data[i] = v
+                                        # load the data
+                                        print 'loading '+i+' from '+SRC_DIRECTORY
+                                        # print 'type(i): '+str(type(i))
+                                        modis_obj = df.DataField(\
+                                                                 datafilename=i\
+                                                                 ,datafieldname='Water_Vapor_Infrared'\
+                                                                 ,srcdirname=SRC_DIRECTORY\
+                                                                 ,hack_branchcut_threshold=200\
+                                        )
+                                        modis_objs.append(modis_obj)
     
             #
             # Get the sizes, allocate the arrays, and then fill them
@@ -547,9 +563,11 @@ for krigeBox in targetBoxes:
             # vmin=np.nanmin(data1); vmax=np.nanmax(data1)
 
             inf_detected = False
-            max_iter_start = 5
             max_iter = max_iter_start
             npts_in = npts
+            npts_increase_flag = True
+            npts_last_kr_s     = 0
+            
             while( True ):
                 print 'npts_in( '+str(k)+' ) = '+str(npts_in)
                 kr=0
@@ -579,12 +597,14 @@ for krigeBox in targetBoxes:
                 kr_s_mn = np.nanmin(kr.s)
                 kr_s_mx = np.nanmax(kr.s)
                 max_iter = max_iter - 1
-                print 'kr_mx,data_mx_in_grid:     ',kr_mx,data_mx_in_grid
-                print 'kr_s_mn,kr_s_mn:           ',kr_s_mn,kr_s_mx
+                print 'kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid: ',kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid
                 if (max_iter < 1) or ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
                     if (max_iter < 1):
                         print '**'
-                        print '*** max_iter exceeded, continuing to next tile'
+                        if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
+                            print '*** max_iter exceeded, continuing to next tile'
+                        else:
+                            print '*** max_iter exceeded, kriging probably diverged, continuing to next tile'
                     if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
                         print '**'
                         print '*** kriging seems to have converged'
@@ -592,18 +612,31 @@ for krigeBox in targetBoxes:
                 else:
                     print '***'
                     print '*** kriging diverged, changing npts, iter: ',max_iter_start-1-max_iter
-                    if np.inf in kr.z:
-                        if inf_detected:
-                            print 'inf detected again, increasing npts'
-                            npts_in = npts_in*npts_increase_factor
-                            inf_detected = False
-                        else:
-                            print 'inf detected, reducing npts'
-                            npts_in = npts_in*0.75
-                            inf_detected = True
-                    else:
-                        print 'increasing npts'
+
+                    # s_mn should be positive, hopefully small
+                    if np.abs(kr_s_mn) > npts_last_kr_s:
+                        print('kr_s_mn increased, changing npts change direction')
+                        npts_increase_flag = not npts_increase_flag
+                    npts_last_kr_s = np.abs(kr_s_mn)
+                    if npts_increase_flag:
+                        print('increasing npts by '+str(npts_increase_factor))
                         npts_in = npts_in*npts_increase_factor
+                    else:
+                        print('decreasing npts by '+str(npts_decrease_factor))
+                        npts_in = npts_in*npts_decrease_factor
+                        
+                    # if np.inf in kr.z:
+                    #     if inf_detected:
+                    #         print 'inf detected again, increasing npts'
+                    #         npts_in = npts_in*npts_increase_factor
+                    #         inf_detected = False
+                    #     else:
+                    #         print 'inf detected, reducing npts'
+                    #         npts_in = npts_in*0.75
+                    #         inf_detected = True
+                    # else:
+                    #     print 'increasing npts'
+                    #     npts_in = npts_in*npts_increase_factor
                                  
             krigeSketch_results.append(kr)
 
@@ -660,16 +693,17 @@ if True:
 
 plot_configuration = Krige.krigePlotConfiguration(source_data              = False\
                                                   ,source_data_last_sample = False\
-                                                  ,title         = '.'.join(krigeSketch_results[0].title.split('.',3)[0:2])\
-                                                  ,zVariableName = krigeSketch_results[0].zVariableName\
-                                                  ,vmap          = Krige.log10_map\
+                                                  ,title                   = '.'.join(krigeSketch_results[0].title.split('.',3)[0:2])\
+                                                  ,zVariableName           = krigeSketch_results[0].zVariableName\
+                                                  ,vmap                    = Krige.log10_map\
+                                                  ,meridians_and_parallels = False\
 )
 
 # Save an HDF file
 # TODO The following is currently broken
 # TODO Apparently SWATH does not mean irregular.
 if True:
-
+    print('KrigeSketch saving to HDF')
     # Now, we use tgt_X1d and tgt_Y1d
     ny = tgt_Y1d.size
     nx = tgt_X1d.size
@@ -687,8 +721,8 @@ if True:
     i=0
     for kr in krigeSketch_results:
         for k in range(kr.x.size):
-            tgt_x_idx = np.where(tgt_X1d == kr.x[k])
-            tgt_y_idx = np.where(tgt_Y1d == kr.y[k])
+            tgt_x_idx = np.where(np.abs(tgt_X1d - kr.x[k]) < 1.0e-10)
+            tgt_y_idx = np.where(np.abs(tgt_Y1d - kr.y[k]) < 1.0e-10)
 
             if (len(tgt_x_idx) != 1) or (len(tgt_y_idx) != 1):
                 print('*** tgt_?_idx error. ')
@@ -702,28 +736,28 @@ if True:
                 s[tgt_y_idx[0],tgt_x_idx[0]] = kr.s[k]
         
     variable_name   = krigeSketch_results[-1].zVariableName
-    output_filename = "KrigeSketch_"+modis_obj.datafilename+".hdf"
+    output_filename = "KrigeSketch.hdf"
     if '.hdf.hdf' in output_filename[-8:]:
         output_filename = output_filename[:-4]
-        
+
+    # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
     kHDF = Krige.krigeHDF(\
                           krg_name                 = variable_name+'_krg'\
                           ,krg_units               = modis_obj.units\
                           ,config                  = krigeSketch_results[-1].config\
-                          ,krg_z                   = z
-                          ,krg_s                   = s
-                          ,krg_x                   = tgt_X1d
-                          ,krg_y                   = tgt_Y1d
+                          ,krg_z                   = z\
+                          ,krg_s                   = s\
+                          ,krg_x                   = tgt_X1d\
+                          ,krg_y                   = tgt_Y1d\
                           ,orig_name               = modis_obj.datafieldname\
-                          ,orig_units              = modis_obj.units\
-                          ,orig_z                  = nans
-                          ,orig_x                  = tgt_X1d
-                          ,orig_y                  = tgt_Y1d
+                          ,orig_units              = modis_obj.units\                          
                           ,output_filename         = output_filename\
                           ,redimension             = False\
                           ,type_hint               = 'grid'\
     )
     kHDF.save()
+    print('KrigeSketch finished saving to HDF')
+
 
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 end_time = time.time()

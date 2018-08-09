@@ -34,6 +34,7 @@ _plot_kriged_data              = plot_configuration.kriged_data
 _plot_kriged_outline           = plot_configuration.kriged_outline
 _plot_variogram                = plot_configuration.variogram
 _plot_kriged_data_outline      = plot_configuration.kriged_data_outline
+_plot_meridians_and_parallels  = plot_configuration.meridians_and_parallels
 
 # marker_size = 3.5
 # marker_size = 1
@@ -81,8 +82,9 @@ m = Basemap(projection='cyl',resolution='h'\
             ,ax=ax\
             ,lat_0=lat_0, lon_0=lon_0)
 m.drawcoastlines(linewidth=0.5)
-m.drawparallels(np.arange(-90.0, 91., 10.), labels=[1, 0, 0, 0])
-m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
+if _plot_meridians_and_parallels:
+    m.drawparallels(np.arange(-90.0, 91., 10.), labels=[1, 0, 0, 0])
+    m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
 
 # if _plot_source_data_outside_grid:
 #     modis_obj_2 = df.DataField(\

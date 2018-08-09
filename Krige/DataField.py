@@ -428,8 +428,9 @@ custom_loader=None.  A callable(self) that allows a user to write a
 
     def load05(self):
         hdf = SD(self.srcdirname+self.datafilename, SDC.READ)
-        ds  = hdf.select(self.datafieldname)
-        # ds_dims = [ds.dimensions()[i] for i in ds.dimensions().keys()]
+        ds = hdf.select(self.datafieldname)
+
+            # ds_dims = [ds.dimensions()[i] for i in ds.dimensions().keys()]
 
         self.colormesh_title = self.datafilename
 
