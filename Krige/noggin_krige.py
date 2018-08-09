@@ -4,7 +4,10 @@
 Example:
 python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2/ -n Water_Vapor_Infrared -m gamma_rayleigh_nuggetless_variogram_model -v
 
-python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MYD08_D3/ -n Atmospheric_Water_Vapor_Mean -m gamma_rayleigh_nuggetless_variogram_model -v
+python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MYD08_D3/ -n Atmospheric_Water_Vapor_Mean -m gamma_rayleigh_nuggetless_variogram_model -v -G
+
+python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2-1/ -n Water_Vapor_Infrared -m spherical -v -r 0.25 -R
+
 
 2018-0808 ML Rilee, RSTLLC, mike@rilee.net
 """
@@ -64,7 +67,12 @@ parser.set_defaults(output_filename = 'noggin_krige.hdf')
 parser.add_argument('-s','--sampling_fraction'\
                     ,dest='sampling_fraction'\
 #                    ,metavar='samplingFraction'\
-                    ,type=float, help='Suggested fraction of data to sample. NOT IMPLEMENTED.')
+                    ,type=float, help='Suggested fraction of data to sample.')
+
+parser.add_argument('-S','--Sampling_number'\
+                    ,dest='lores_npts'\
+                    ,type=int\
+                    ,help='Set a target for the number of points to be sampled from the source data. Conflicts with sampling_fraction.')
 
 parser.add_argument('-l','--variogram_bin_number'\
                     ,dest='variogram_nlags'\
@@ -88,20 +96,20 @@ parser.set_defaults(grid_resolution=1.0)
 parser.add_argument('-G','--GapFill'\
                     ,dest='gap_fill'\
                     ,action='store_true'\
-                    ,help='Perform a gap filling calculation on one file of Level 3 data. NOT IMPLEMENTED.')
+                    ,help='Perform a gap filling calculation on one file of Level 3 data.')
 parser.set_defaults(gap_fill=False)
 
 parser.add_argument('-R','--Restrict'\
                     ,dest='restrict_to_bounding_box'\
                     ,action='store_true'\
-                    ,help='Restricts the target grid to a bounding box around the source data. NOT IMPLEMENTED.')
+                    ,help='Restricts the target grid to a bounding box around the source data.')
 parser.set_defaults(restrict_to_bounding_box=False)
 
-parser.add_argument('-S','--SingleTile'\
-                    ,dest='single_tile'\
-                    ,action='store_true'\
-                    ,help='Krige to a single tile. Useful for Level 3 calculations. Implied by GapFill. NOT IMPLEMENTED.')
-parser.set_defaults(single_tile=False)
+# parser.add_argument('-S','--SingleTile'\
+#                     ,dest='single_tile'\
+#                     ,action='store_true'\
+#                     ,help='Krige to a single tile. Useful for Level 3 calculations. Implied by GapFill. NOT IMPLEMENTED.')
+# parser.set_defaults(single_tile=False)
 
 # parser.add_argument(''\
 #                     )
@@ -121,6 +129,10 @@ if len(sys.argv) == 1:
 args=parser.parse_args()
 
 _flag_error_exit=False
+
+if (args.sampling_fraction is not None) and (args.lores_npts is not None):
+    print('noggin_krige: error: sampling fraction and sampling number are both set. One or none should be set.')
+    _flag_error_exit=True
 
 if args.datafieldname is None:
     print('noggin_krige: error: variable/datafieldname -n must be specified.')
@@ -172,7 +184,10 @@ tgt_grid_dLat                   = args.grid_resolution
 _sampling_fraction              = args.sampling_fraction
 if _sampling_fraction is None:
     # lores_npts = 2000
-    lores_npts = 3500
+    if args.lores_npts is None:
+        lores_npts = 3500
+    else:
+        lores_npts = args.lores_npts
 else:
     lores_npts = None
 
@@ -247,7 +262,8 @@ hires_calc = []
 # npts_adapt_flag    = True # 
 npts_increase_flag = True
 # npts_last_kr_s = 0
-max_iter_start = 5
+# max_iter_start = 5
+max_iter_start = 8
 k = -1
 
 divergence_threshold = 1.5
@@ -260,20 +276,29 @@ npts_decrease_factor = 0.75
 # TODO Inject dependencies to parameterize
 
 ###########################################################################
+
+# Some defaults for the following...
+hires_npts_scale = 2
+hires_calc = []
+
+###########################################################################
 ## TODO use bb to limit the following
 # if args.restrict_to_bounding_box:
-if False:
+if args.restrict_to_bounding_box:
     bb_lons,bb_lats = bb.lons_lats()
     lon0 = bb_lons[0]
     lon1 = bb_lons[1]
     lat0 = bb_lats[0]
     lat1 = bb_lats[1]
-    dLon = min((lon1-lon0)/3,120)
-    dLat = min((lat1-lat0)/3,10)
+    dLon = lon1-lon0
+    dLat = lat1-lat0
+    if np.abs(dLon) > 180 or np.abs(dLat) > 90:
+        print('noggin_krige: error: source data bounding box too big or malformed. exiting.')
+        sys.exit(1)
     # dSearchLon = 0.75*dLon
     # dSearchLat = 0.75*dLat
     dSearchScale = 0.25
-    hires_npts = lores_npts * 2
+    hires_npts_scale = 2
 
 ###########################################################################
 
@@ -282,7 +307,7 @@ elif args.gap_fill:
     dLat = 180
     lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90    
     dSearchScale = 0.25 # unnecessary for 1-file level 3 gap filling.
-    hires_npts = lores_npts * 2
+    hires_npts_scale = 2
     hires_calc = []
     divergence_threshold = 1.5
     npts_increase_factor = 1.5
@@ -304,7 +329,7 @@ else:
     # lores_npts = 2000
     # lores_npts = 3000
     # lores_npts = 3500
-    hires_npts = lores_npts * 2
+    hires_npts_scale = 2
     # hires_npts = 4000
     # hires_calc = [5,11,37,48,60,61,63,67,68]
     # hires_calc = [0,1]
@@ -333,7 +358,8 @@ for iLon in range(lon0,lon1,dLon):
                                     ,df.Point((iLon+dLon, jLat+dLat))))
         targetBoxes.append(krigeBox)
 ###########################################################################
-if _debug:
+#if _debug:
+if True:
     print('lon0,lon1,dLon: ',lon0,lon1,dLon)
     print('lat0,lat1,dLat: ',lat0,lat1,dLat)
     print('noggin_krige: len(targetBoxes) = '+str(len(targetBoxes)))
@@ -474,6 +500,9 @@ for krigeBox in targetBoxes:
             sizes_modis_objs      = [ m.data.size for m in modis_objs ]
             total_size_modis_objs = sum(sizes_modis_objs)
 
+            if _sampling_fraction is not None:
+                lores_npts = _sampling_fraction * total_size_modis_objs
+
             if _verbose:
                 print('noggin_krige.py: total number of data points loaded: '+str(total_size_modis_objs))
     
@@ -520,6 +549,14 @@ for krigeBox in targetBoxes:
             in_grid = grid.in_grid(longitude1,latitude1)
             ex_grid = grid.ex_grid(longitude1,latitude1)
 
+            if(len(in_grid[0]) == 0):
+                print('noggin_krige: len(in_grid[0]) == 0), no source data. continuing')
+                continue
+
+            if _debug:
+                print('len(in_grid): '+str(len(in_grid)))
+                print('in_grid: '+str(in_grid))
+
             data_mx_in_grid = np.nanmax(data1[in_grid])
         
             # Calculate variogram
@@ -538,7 +575,7 @@ for krigeBox in targetBoxes:
 
             # e.g. hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
             if k in hires_calc:
-                npts = hires_npts
+                npts = hires_npts_scale * lores_npts
             else:
                 npts = lores_npts
 
