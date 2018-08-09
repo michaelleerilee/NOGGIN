@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 """Krige all the given files in a directory to a grid.
 
+Example:
+python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2/ -n Water_Vapor_Infrared -m gamma_rayleigh_nuggetless_variogram_model -v
+
+python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MYD08_D3/ -n Atmospheric_Water_Vapor_Mean -m gamma_rayleigh_nuggetless_variogram_model -v
+
 2018-0808 ML Rilee, RSTLLC, mike@rilee.net
 """
 
@@ -31,15 +36,24 @@ import pykrige.variogram_models as vm
 start_time = time.time()
 
 parser = argparse.ArgumentParser(description='Capture krige control parameters.')
-parser.add_argument('-s','--sampling_fraction'\
-                    ,dest='sampling_fraction'\
-#                    ,metavar='samplingFraction'\
-                    ,type=float, help='Suggested fraction of data to sample.')
 
 parser.add_argument('-d','--input_directory'\
                     ,dest='inputDirectory'\
                     ,type=str\
+                    ,required=True\
                     ,help='The directory to search for input files.')
+
+parser.add_argument('-m','--variogram_model'\
+                    ,dest='variogram_model'\
+                    ,type=str\
+                    ,required=True\
+                    ,help='The name of the variogram model to use. [e.g. "spherical","gamma_rayleigh_nuggetless_variogram_model"]')
+
+parser.add_argument('-n','--variable_name'\
+                    ,dest='datafieldname'\
+                    ,type=str\
+                    ,required=True\
+                    ,help='The variable or datafield name to load.')
 
 parser.add_argument('-o','--output_filename'\
                     ,dest='output_filename'\
@@ -47,29 +61,51 @@ parser.add_argument('-o','--output_filename'\
                     ,help='The output file for the results')
 parser.set_defaults(output_filename = 'noggin_krige.hdf')
 
+parser.add_argument('-s','--sampling_fraction'\
+                    ,dest='sampling_fraction'\
+#                    ,metavar='samplingFraction'\
+                    ,type=float, help='Suggested fraction of data to sample. NOT IMPLEMENTED.')
+
 parser.add_argument('-l','--variogram_bin_number'\
                     ,dest='variogram_nlags'\
                     ,type=int\
-                    ,help='The number of bins (of lags) for the variogram calculation.')
+                    ,help='The number of bins (of lags) for the variogram calculation. Default 8.')
 parser.set_defaults(variogram_nlags=8)
 # parser.set_defaults(variogram_nlags=12)
-
-parser.add_argument('-m','--variogram_model'\
-                    ,dest='variogram_model'\
-                    ,type=str\
-                    ,help='The name of the variogram model to use.')
-
-parser.add_argument('-n','--variable_name'\
-                    ,dest='datafieldname'\
-                    ,type=str\
-                    ,help='The variable or datafield name to load.')
 
 parser.add_argument('-v','--verbose'\
                     ,dest='verbose'\
                     ,action='store_true'\
                     ,help='Toggle verbose printing')
-
 parser.set_defaults(verbose=False)
+
+parser.add_argument('-r','--resolution'\
+                    ,dest='grid_resolution'\
+                    ,type=float\
+                    ,help='The resolution for a lat-lon target grid in degrees.')
+parser.set_defaults(grid_resolution=1.0)
+
+parser.add_argument('-G','--GapFill'\
+                    ,dest='gap_fill'\
+                    ,action='store_true'\
+                    ,help='Perform a gap filling calculation on one file of Level 3 data. NOT IMPLEMENTED.')
+parser.set_defaults(gap_fill=False)
+
+parser.add_argument('-R','--Restrict'\
+                    ,dest='restrict_to_bounding_box'\
+                    ,action='store_true'\
+                    ,help='Restricts the target grid to a bounding box around the source data. NOT IMPLEMENTED.')
+parser.set_defaults(restrict_to_bounding_box=False)
+
+parser.add_argument('-S','--SingleTile'\
+                    ,dest='single_tile'\
+                    ,action='store_true'\
+                    ,help='Krige to a single tile. Useful for Level 3 calculations. Implied by GapFill. NOT IMPLEMENTED.')
+parser.set_defaults(single_tile=False)
+
+# parser.add_argument(''\
+#                     )
+# parser.set_defaults()
 
 # parser.add_argument('-a','--adapt_fraction'\
 #                     ,dest='adaptFraction'\
@@ -77,6 +113,11 @@ parser.set_defaults(verbose=False)
 #                     ,type=bool, help='Vary the sampling fraction over iterations.')
 
 
+
+if len(sys.argv) == 1:
+    parser.print_help()
+    sys.exit()
+    
 args=parser.parse_args()
 
 _flag_error_exit=False
@@ -85,13 +126,14 @@ if args.datafieldname is None:
     print('noggin_krige: error: variable/datafieldname -n must be specified.')
     _flag_error_exit=True
 
-if args.variogram_nlags is None:
-    print('noggin_krige: error: -l variogram_nlags must be specified.')
-    _flag_error_exit=True
+#if args.variogram_nlags is None:
+#    print('noggin_krige: error: -l variogram_nlags must be specified.')
+#    _flag_error_exit=True
 
 if args.variogram_model is None:
     print('noggin_krige: error: -m --variogram_model must be specified. e.g. "spherical" or "gamma_rayleigh_nuggetless_variogram_model"')
     _flag_error_exit=True
+
 
 output_filename = args.output_filename
 _verbose = args.verbose
@@ -119,6 +161,11 @@ _drive_OKrige_weight            = False
 _drive_OKrige_verbose           = args.verbose
 _drive_OKrige_eps               = 1.0e-10 # Not well implemented
 _drive_OKrige_backend           = 'vectorized'
+
+# tgt_grid_dLon = 0.5; tgt_grid_dLat = 0.5
+# These might conflict with GapFill.
+tgt_grid_dLon                   = args.grid_resolution
+tgt_grid_dLat                   = args.grid_resolution
 
 ###########################################################################
 
@@ -172,6 +219,24 @@ if _save_index:
 boxes = modis_BoundingBoxes
 
 ###########################################################################
+# Check on gap fill case.
+if args.gap_fill:
+    if len(boxes) != 1:
+        print('noggin_krige: error: processing more than one level 3 file at a time not implemented')
+        sys.exit(1)
+    obj_shape = modis_obj.data.shape
+    ny = obj_shape[0]; test_dy = 180.0/ny
+    nx = obj_shape[1]; test_dx = 360.0/nx
+    if test_dy != test_dx:
+        print('noggin_krige: error: unexpected data shape aspect ratio.')
+        print('noggin_krige: error: nx,ny = '+str(nx)+', '+str(ny))
+        print('noggin_krige: error: dx,dy = '+str(test_dx)+', '+str(test_dy))
+        sys.exit(1)
+    tgt_grid_dLon = test_dx
+    tgt_grid_dLat = test_dy
+    
+# sys.exit(1)
+###########################################################################
 # Initialize variables
 ## TODO: Should we have boxes and tiles in the same structure?
 targetBoxes=[]
@@ -196,6 +261,7 @@ npts_decrease_factor = 0.75
 
 ###########################################################################
 ## TODO use bb to limit the following
+# if args.restrict_to_bounding_box:
 if False:
     bb_lons,bb_lats = bb.lons_lats()
     lon0 = bb_lons[0]
@@ -207,22 +273,33 @@ if False:
     # dSearchLon = 0.75*dLon
     # dSearchLat = 0.75*dLat
     dSearchScale = 0.25
-    dSearchLon = dSearchScale*dLon
-    dSearchLat = dSearchScale*dLat
     hires_npts = lores_npts * 2
 
 ###########################################################################
+
+elif args.gap_fill:
+    dLon = 360
+    dLat = 180
+    lon0 = -180; lon1 = 180; lat0 = -90; lat1 = 90    
+    dSearchScale = 0.25 # unnecessary for 1-file level 3 gap filling.
+    hires_npts = lores_npts * 2
+    hires_calc = []
+    divergence_threshold = 1.5
+    npts_increase_factor = 1.5
+    npts_decrease_factor = 0.75
+    
+###########################################################################
 ##
-if True:
+# else or if not args.restrict_to_bounding_box:
+# DEFAULT
+else:
     dLon = 120
     dLat = 10
     # dSearchScale = 0.75
     dSearchScale = 0.25 # Amount beyond the tile to search for granules.
-    dSearchLon = dSearchScale*dLon
-    dSearchLat = dSearchScale*dLat
-    # Full lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  90-dLat
-    # 4-box test
-    lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  -60-dLat
+    # Full
+    lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  90-dLat
+    # 4-box test    lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 =  -60-dLat
     # lon0 = -180; lon1 = 180; lat0 = -90+dLat; lat1 = -60-dLat
     # lores_npts = 2000
     # lores_npts = 3000
@@ -245,6 +322,9 @@ if True:
                                 ,df.Point((180, 90))))
     targetBoxes.append(cap_north)
 
+dSearchLon = dSearchScale*dLon
+dSearchLat = dSearchScale*dLat
+    
 ###########################################################################
 # Add the other boxes.
 for iLon in range(lon0,lon1,dLon):
@@ -252,7 +332,11 @@ for iLon in range(lon0,lon1,dLon):
         krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
                                     ,df.Point((iLon+dLon, jLat+dLat))))
         targetBoxes.append(krigeBox)
-
+###########################################################################
+if _debug:
+    print('lon0,lon1,dLon: ',lon0,lon1,dLon)
+    print('lat0,lat1,dLat: ',lat0,lat1,dLat)
+    print('noggin_krige: len(targetBoxes) = '+str(len(targetBoxes)))
 ###########################################################################
 
 
@@ -261,24 +345,28 @@ for iLon in range(lon0,lon1,dLon):
 # Construct the target grid from targetBoxes.
 # Make a bounding box covering everything, and then grid that at a given resolution.
 
+# TODO: NOTE !!! If we are gap_fill, shouldn't we use the lon-lat from modis_obj?
+
 cover = df.BoundingBox()
 for box in targetBoxes:
     cover = cover.union(box)
 tgt_lons,tgt_lats = cover.lons_lats()
-if _verbose:
+if _debug:
     print('noggin_krige: tgt lons,lats: '+str(tgt_lons)+', '+str(tgt_lats))
-tgt_grid_dLon = 0.5
-tgt_grid_dLat = 0.5
-tgt_grid_full = Krige.rectangular_grid(\
-                                       x0 = tgt_lons[0]\
-                                       ,x1 = tgt_lons[1]\
-                                       ,dx = tgt_grid_dLon\
-                                       ,y0 = tgt_lats[0]\
-                                       ,y1 = tgt_lats[1]\
-                                       ,dy = tgt_grid_dLat\
-                                       )
-
-tgt_X1d,tgt_Y1d = tgt_grid_full.gridxy1d()
+    
+if args.gap_fill:
+    tgt_X1d = modis_obj.longitude[0,:]
+    tgt_Y1d = modis_obj.latitude [:,0]
+else:
+    tgt_grid_full = Krige.rectangular_grid(\
+                                           x0 = tgt_lons[0]\
+                                           ,x1 = tgt_lons[1]\
+                                           ,dx = tgt_grid_dLon\
+                                           ,y0 = tgt_lats[0]\
+                                           ,y1 = tgt_lats[1]\
+                                           ,dy = tgt_grid_dLat\
+    )
+    tgt_X1d,tgt_Y1d = tgt_grid_full.gridxy1d()
 
 tgt_lon0 = np.nanmin(tgt_X1d)
 tgt_lon1 = np.nanmax(tgt_X1d)
@@ -342,8 +430,9 @@ for krigeBox in targetBoxes:
             # krigeBox = df.BoundingBox((df.Point((+135.0, 30.0))\
             #                            ,df.Point((+175.0, 45.0))))
 
-            sb_lons,sb_lats = searchBox.lons_lats()
-            print('sb lons_lats: '+str(sb_lons)+', '+str(sb_lats))
+            if _debug:
+                sb_lons,sb_lats = searchBox.lons_lats()
+                print('sb lons_lats: '+str(sb_lons)+', '+str(sb_lats))
     
             # Find overlapping granules and load the MODIS objects
             src_data   = {}
@@ -353,13 +442,15 @@ for krigeBox in targetBoxes:
                 # if i[0:3] in _load_datasets: # Check to see if we're loading something DataField knows about.
                 if True:
                     lons,lats = v.lons_lats()
-                    print('v lons_lats: '+str(lons)+', '+str(lats))
+                    if _debug:
+                        print('v lons_lats: '+str(lons)+', '+str(lats))
                     if (np.nanmax(np.abs(lons)) <= 360.0)\
                        and (np.nanmax(np.abs(lats)) <= 90.0):
                         # o = krigeBox.overlap(v)
                         o = searchBox.overlap(v)
-                        for _o in o:
-                            print('o overlap: '+str(_o.lons_lats()))
+                        if _debug:
+                            for _o in o:
+                                print('o overlap: '+str(_o.lons_lats()))
                         if len(o) > 0:
                             for kb in o:
                                 if not kb.emptyp():
@@ -400,13 +491,32 @@ for krigeBox in targetBoxes:
     
                 
             #
-            idx = np.where(~np.isnan(data))
-            data1      = data[idx]
-            latitude1  = latitude[idx]
-            longitude1 = longitude[idx]
+            if not args.gap_fill:
+                idx_source = np.where(~np.isnan(data))
+            else:
+                idx_source = np.where( ~np.isnan(data)\
+                                      & (latitude > lat0) \
+                                      & (latitude < lat1) \
+                                      & (longitude > lon0) \
+                                      & (longitude < lon1))
+                idx_target = np.where(  np.isnan(data)\
+                                      & (latitude > lat0) \
+                                      & (latitude < lat1) \
+                                      & (longitude > lon0) \
+                                      & (longitude < lon1))
+
+            data1      = data[idx_source]
+            latitude1  = latitude[idx_source]
+            longitude1 = longitude[idx_source]
 
             #### See start of loop... grid = targetTiles[k]
             gridx,gridy = grid.gridxy()
+
+            # TODO Fix hijacking of the gridx & gridy
+            if args.gap_fill:
+                gridx  = longitude[idx_target]
+                gridy  = latitude [idx_target]
+            
             in_grid = grid.in_grid(longitude1,latitude1)
             ex_grid = grid.ex_grid(longitude1,latitude1)
 
@@ -552,7 +662,7 @@ if True:
 # TODO The following is currently broken
 # TODO Apparently SWATH does not mean irregular.
 if True:
-    print('KrigeSketch saving to HDF')
+    print('noggin_krige saving to HDF')
     # Now, we use tgt_X1d and tgt_Y1d
     ny = tgt_Y1d.size
     nx = tgt_X1d.size
@@ -586,30 +696,56 @@ if True:
         
     variable_name   = krigeSketch_results[-1].zVariableName
 
-    # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
-    kHDF = Krige.krigeHDF(\
-                          krg_name                 = variable_name+'_krg'\
-                          ,krg_units               = modis_obj.units\
-                          ,config                  = krigeSketch_results[-1].config\
-                          ,krg_z                   = z\
-                          ,krg_s                   = s\
-                          ,krg_x                   = tgt_X1d\
-                          ,krg_y                   = tgt_Y1d\
-                          ,orig_name               = modis_obj.datafieldname\
-                          ,orig_units              = modis_obj.units\
-                          ,output_filename         = output_filename\
-                          ,redimension             = False\
-                          ,type_hint               = 'grid'\
-    )
-    kHDF.save()
-    print('KrigeSketch finished saving to HDF')
+    if not args.gap_fill:
+        # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
+        kHDF = Krige.krigeHDF(\
+                              krg_name                 = variable_name+'_krg'\
+                              ,krg_units               = modis_obj.units\
+                              ,config                  = krigeSketch_results[-1].config\
+                              ,krg_z                   = z\
+                              ,krg_s                   = s\
+                              ,krg_x                   = tgt_X1d\
+                              ,krg_y                   = tgt_Y1d\
+                              ,orig_name               = modis_obj.datafieldname\
+                              ,orig_units              = modis_obj.units\
+                              ,output_filename         = output_filename\
+                              ,redimension             = False\
+                              ,type_hint               = 'grid'\
+        )
+    else:
+        # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
+        #
+        # This should be a Level 3 case.
+        #
+        # For args.gap_fill == True, krg_x == orig_x == modis_obj.longitude == tgt_X1d, except for maybe the shape.
+        # Here, there should only be one source file and one target file.
+        #
+        kHDF = Krige.krigeHDF(\
+                              krg_name                 = variable_name+'_krg'\
+                              ,krg_units               = modis_obj.units\
+                              ,config                  = krigeSketch_results[-1].config\
+                              ,krg_z                   = z\
+                              ,krg_s                   = s\
+                              ,krg_x                   = tgt_X1d\
+                              ,krg_y                   = tgt_Y1d\
+                              ,orig_z                  = modis_obj.data
+                              ,orig_x                  = tgt_X1d\
+                              ,orig_y                  = tgt_Y1d\
+                              ,orig_name               = modis_obj.datafieldname\
+                              ,orig_units              = modis_obj.units\
+                              ,output_filename         = output_filename\
+                              ,redimension             = False\
+                              ,type_hint               = 'grid'\
+        )
 
+    kHDF.save()
+    print('noggin_krige: finished saving to HDF')
 
 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 end_time = time.time()
 print 'wall clock run time (sec) = '+str(end_time-start_time)
 
-print 'KrigeSketch done'
+print 'noggin_krige done'
 
 
 

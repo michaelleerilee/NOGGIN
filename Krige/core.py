@@ -382,7 +382,8 @@ The shape of the orig_? arrays is used to format the datasets written to output 
                 #  or (self.krg_z is None):
                 orig_and_krg = None
             else:
-                orig_and_krg = np.zeros(self.orig_z.shape)
+                # orig_and_krg = np.zeros(self.orig_z.shape)
+                orig_and_krg = np.copy(self.orig_z)
             if self.krg_z is not None:
                 krg = np.zeros(self.krg_z.shape)
                 krg[:,:] = np.nan
@@ -393,8 +394,6 @@ The shape of the orig_? arrays is used to format the datasets written to output 
                 s[:,:] = np.nan
             else:
                 s = None
-            if self.orig_z is not None:
-                orig_and_krg[:,:] = self.orig_z
 
         if True:
             if redimension:
@@ -414,7 +413,8 @@ The shape of the orig_? arrays is used to format the datasets written to output 
                 s   = self.krg_s
                 
                 if orig_and_krg is not None:
-                    idx = np.where( orig_and_krg == np.nan )
+                    print('orig_and_krg')
+                    idx = np.where( np.isnan(orig_and_krg) )
                     # TODO check to see if krg_z and orig_z have the same shape
                     orig_and_krg[idx] = self.krg_z[idx]
 
@@ -503,7 +503,7 @@ type_hint == 'grid'  => Try to reinterpret the POINT (irregular) data grid type 
                 # initialize dataset values here
                 dset[:,:] = self.orig_and_krg
                 # Creating attributes 
-                dset.attrs['units'] = self.krg_units
+                dset.attrs      ['units'] = self.krg_units
                 dset.attrs['coordinates'] = "latitude longitude"
                 dset.attrs['source_variable'] = self.orig_name
                 datafields_added.append(datafields_base+variable_name)

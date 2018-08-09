@@ -278,8 +278,8 @@ data1      = modis_obj.data     [idx_source]
 
 gridx  = modis_obj.longitude[idx_target]
 gridy  = modis_obj.latitude [idx_target]
-gridz  = np.zeros(gridx.shape)
-gridss = np.zeros(gridx.shape)
+gridz  = np.zeros(gridx.shape) # superfluous?
+gridss = np.zeros(gridx.shape) # superfluous?
 
 data_mx_in_grid = np.nanmax(data1)
 
