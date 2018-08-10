@@ -356,6 +356,7 @@ class DataField(object):
     """Access a datafield in an HDFEOS (was MODIS) file"""
     # TODO Add an object or classes that can handle swath or grid
     # TODO rename key_*...
+    # key along, across are now dated...
     key_along  ='Cell_Along_Swath_5km:mod05'
     key_across ='Cell_Across_Swath_5km:mod05'
     key_units  ='units'

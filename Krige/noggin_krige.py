@@ -13,6 +13,7 @@ python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}
 """
 
 import argparse
+from collections import Counter
 import json
 import math
 import os
@@ -102,8 +103,13 @@ parser.set_defaults(gap_fill=False)
 parser.add_argument('-R','--Restrict'\
                     ,dest='restrict_to_bounding_box'\
                     ,action='store_true'\
-                    ,help='Restricts the target grid to a bounding box around the source data.')
+                    ,help='Restricts the target grid to a bounding box. Defaults to a bounding box around source data.')
 parser.set_defaults(restrict_to_bounding_box=False)
+
+parser.add_argument('-b','--bounding_box'\
+                    ,dest='bounding_box'\
+                    ,type=float, nargs=4\
+                    ,help='Define a target region of interest, lon0, lat0, lon1, lat1. No effect without --Restrict. NOT TESTED.')
 
 # parser.add_argument('-S','--SingleTile'\
 #                     ,dest='single_tile'\
@@ -285,16 +291,20 @@ hires_calc = []
 ## TODO use bb to limit the following
 # if args.restrict_to_bounding_box:
 if args.restrict_to_bounding_box:
-    bb_lons,bb_lats = bb.lons_lats()
+    if args.bounding_box is None:
+        bb_lons,bb_lats = bb.lons_lats()
+    else:
+        bb_lons = [args.bounding_box[0],args.bounding_box[2]]; bb_lons.sort()
+        bb_lats = [args.bounding_box[1],args.bounding_box[3]]; bb_lats.sort()
     lon0 = bb_lons[0]
     lon1 = bb_lons[1]
     lat0 = bb_lats[0]
     lat1 = bb_lats[1]
     dLon = lon1-lon0
     dLat = lat1-lat0
-    if np.abs(dLon) > 180 or np.abs(dLat) > 90:
-        print('noggin_krige: error: source data bounding box too big or malformed. exiting.')
-        sys.exit(1)
+    #if np.abs(dLon) > 180 or np.abs(dLat) > 90:
+    #    print('noggin_krige: error: source data bounding box too big or malformed. exiting.')
+    #    sys.exit(1)
     # dSearchLon = 0.75*dLon
     # dSearchLat = 0.75*dLat
     dSearchScale = 0.25
@@ -358,8 +368,7 @@ for iLon in range(lon0,lon1,dLon):
                                     ,df.Point((iLon+dLon, jLat+dLat))))
         targetBoxes.append(krigeBox)
 ###########################################################################
-#if _debug:
-if True:
+if _debug:
     print('lon0,lon1,dLon: ',lon0,lon1,dLon)
     print('lat0,lat1,dLat: ',lat0,lat1,dLat)
     print('noggin_krige: len(targetBoxes) = '+str(len(targetBoxes)))
@@ -517,8 +526,27 @@ for krigeBox in targetBoxes:
                     print('adding indexes: ', i0, i1)
                 data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel()
                 i0=i1
-    
-                
+
+            # # The data have been loaded. You can search for duplicates now.
+            # if False:
+            #     dup_lons = [ lon for lon,count in Counter(longitude).iteritems() if count > 1 ]
+            #     if len(dup_lons) > 0:
+            #         dup_lats = [ lat for lat,count in Counter(latitude).iteritems() if count > 1 ]
+            #         if len(dup_lats) > 0:
+            #             dup_lons_idx     = np.where(np.in1d(longitude,dup_lons)); # dup_lons_idx.sort()
+            #             dup_lats_idx     = np.where(np.in1d(latitude, dup_lats)); # dup_lats_idx.sort()
+            #             dup_lonlats_idx  = np.where(np.in1d(dup_lons_idx,dup_lats_idx))
+            #             dups_idx = dup_lons_idx[dup_lonlats_idx]:
+            #             for ii = range(len(dups_idx)):
+            #                 ln0 = longitude[dups_idx[ii]]
+            #                 lt0 = latitude [dups_idx[ii]]
+            #                 for jj = range(1,len(dups_idx)):
+            #                     
+            #                 
+            #                 sum = 0
+            #                 n   = 0
+            #                 for dupi in dup_lons_idx[dup_lonlats_idx]:
+                            
             #
             if not args.gap_fill:
                 idx_source = np.where(~np.isnan(data))
@@ -622,13 +650,14 @@ for krigeBox in targetBoxes:
                                        ,eps=_drive_OKrige_eps\
                                        ,backend=_drive_OKrige_backend\
                 )
+                
                 kr.title         = modis_obj.datafilename[0:17]  # TODO Cut up the data filename better
                 kr.zVariableName = modis_obj.datafieldname
                 kr_mx = np.nanmax(kr.z)
                 kr_s_mn = np.nanmin(kr.s)
                 kr_s_mx = np.nanmax(kr.s)
                 max_iter = max_iter - 1
-                print 'kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid: ',kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid
+                print 'noggin_krige: kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid: ',kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid
                 if (max_iter < 1) or ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
                     if (max_iter < 1):
                         print '**'
@@ -669,6 +698,10 @@ for krigeBox in targetBoxes:
                     #     print 'increasing npts'
                     #     npts_in = npts_in*npts_increase_factor
                                  
+            kr.config.parent_command = sys.argv
+            kr.config.iteration      = k
+            kr.config.files_loaded   = [obj.datafilename for obj in modis_objs]
+            kr.config.datafieldname  = kr.zVariableName
             krigeSketch_results.append(kr)
 
             if _verbose:
@@ -677,7 +710,7 @@ for krigeBox in targetBoxes:
                     +', '+str(np.nanmax(krigeSketch_results[-1].z))+' )'
     
 
-if True:
+if _verbose:
     l=0
     for k in krigeSketch_results:
         print 'mnmx(k): '+str(l)+': ( '+str(np.nanmin(k.z))+' '+str(np.nanmax(k.z))+str(' )')

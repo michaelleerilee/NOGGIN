@@ -461,7 +461,12 @@ type_hint == 'grid'  => Try to reinterpret the POINT (irregular) data grid type 
         
             # Group: /HDFEOS/NOGGIN/KrigeResult2
             grp_3 = grp_2.create_group('KrigeResult2')
-        
+
+            if self.config is not None:
+                grp_4 = grp_3.create_group('KrigeCalculationConfiguration')
+                # TODO: Encapsulate this logic in a configuration object.
+                dset = grp_4.create_dataset('configuration.json',data=self.config.as_json())
+                dset.attrs['json'] = self.config.as_json()
         
             # Group: /HDFEOS/NOGGIN/KrigeResult2/Data Fields
             grp_4 = grp_3.create_group('Data Fields')
@@ -536,10 +541,7 @@ type_hint == 'grid'  => Try to reinterpret the POINT (irregular) data grid type 
                     variable_name = self.orig_name.split('/')[-1]+"_uncertainty"
                     dset = grp_4.create_dataset(variable_name, (ny,nx), maxshape=(ny,nx), dtype=dt)
                     # initialize dataset values here
-                    if self.config.log_calc:
-                        dset[:,:] = np.exp(np.sqrt(self.s))
-                    else:
-                        dset[:,:] = np.sqrt(self.s)
+                    dset[:,:] = np.sqrt(self.s)
                     # Creating attributes
                     dset.attrs['units'] = self.krg_units
                     dset.attrs['coordinates'] = "latitude longitude"
@@ -551,10 +553,7 @@ type_hint == 'grid'  => Try to reinterpret the POINT (irregular) data grid type 
                         dset = grp_4.create_dataset(variable_name, (ny,nx), maxshape=(ny,nx), dtype=dt)
                         # initialize dataset values here
                         tmp = np.zeros(self.s.shape)
-                        if self.config.log_calc:
-                            tmp[:,:] = np.exp(np.sqrt(self.s))/self.krg
-                        else:
-                            tmp[:,:] = np.sqrt(self.s)/self.krg
+                        tmp[:,:] = np.sqrt(self.s)/self.krg
                         tmp[np.where(tmp == np.inf)] = np.nan
                         dset[:,:] = tmp 
                         # Creating attributes
@@ -859,6 +858,10 @@ class krigeConfig(object):
                  ,coordinates_type     = None\
                  ,sampling             = None\
                  ,log_calc             = None\
+                 ,parent_command       = None\
+                 ,iteration            = None\
+                 ,files_loaded         = None\
+                 ,datafieldname        = None\
     ):
         self.noggin_krige_version = Krige.__version__
         self.pykrige_version      = pykrige.__version__
@@ -876,11 +879,17 @@ class krigeConfig(object):
         self.coordinates_type     = coordinates_type
         self.sampling             = sampling
         self.log_calc             = log_calc
+        self.parent_command       = parent_command
+        self.iteration            = iteration
+        self.files_loaded         = files_loaded
+        self.datafieldname        = datafieldname
     def as_dict(self):
         return \
             {\
              'noggin_krige_version': self.noggin_krige_version\
              ,'pykrige_version'    : self.pykrige_version\
+             ,'parent_command'     : self.parent_command\
+             ,'iteration'          : self.iteration\
              ,'coordinates_type'   : self.coordinates_type\
              ,'sampling'           : self.sampling\
              ,'sampling_parameters': \
@@ -903,7 +912,10 @@ class krigeConfig(object):
               'grid_stride'     : self.grid_stride\
               ,'random_permute' : self.random_permute\
               ,'log_calc'       : self.log_calc\
-              }}
+              }\
+             ,'files_loaded'    : self.files_loaded\
+             ,'datafieldname'   : self.datafieldname\
+            }
     def as_json(self):
         return json.dumps(self.as_dict())
     # TODO def from_json(self)...
@@ -942,7 +954,7 @@ and the data_ and the variogram_parameters of the last sub-calculation.
 
 'Geographic' (lon-lat) coordinate type is assumed.
 
-The error estimate 'ss' is returned without modification from the OK calculation. Check log_calc to determine if one should form np.exp(np.sqrt(ss)) to get the correct values & units.
+The error estimate 'ss' is returned without modification from the OK calculation.
 
 """
     if variogram_parameters is None:
@@ -1072,9 +1084,12 @@ The error estimate 'ss' is returned without modification from the OK calculation
                 # print('driveOKrige i_target_portion,mnmx(ln(z)): ',i_target_portion,np.nanmin(z),np.nanmax(z))
             if log_calc:
 	        gridz [i_target_portion] = np.exp(z[:])
+                # For the following, refer to Bevington, p64, 1969.
+	        gridss[i_target_portion] = ss[:]
+                gridss = gridss * ( gridz ** 2 )
             else:
 	        gridz [i_target_portion] = z[:]
-	    gridss[i_target_portion] = ss[:]
+	        gridss[i_target_portion] = ss[:]
 
     # TODO Need to return gridss
     if verbose:
