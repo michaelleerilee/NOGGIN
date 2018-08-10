@@ -8,6 +8,7 @@ python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}
 
 python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2-1/ -n Water_Vapor_Infrared -m spherical -v -r 0.25 -R
 
+python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2-1/ -n Water_Vapor_Infrared -m spherical -v -r 0.25 -R -b -90 -60 0.0 0.0
 
 2018-0808 ML Rilee, RSTLLC, mike@rilee.net
 """
@@ -359,14 +360,29 @@ else:
 
 dSearchLon = dSearchScale*dLon
 dSearchLat = dSearchScale*dLat
+
+# TODO check lon? lat? etc to see if we can convert to int.
     
 ###########################################################################
 # Add the other boxes.
-for iLon in range(lon0,lon1,dLon):
-    for jLat in range(lat0,lat1,dLat):
-        krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
-                                    ,df.Point((iLon+dLon, jLat+dLat))))
-        targetBoxes.append(krigeBox)
+if type(lon0) is int and type(lon1) is int and type(dLon) is int\
+   and type(lat0) is int and type(lat1) is int and type(dLat) is int:
+    for iLon in range(lon0,lon1,dLon):
+        for jLat in range(lat0,lat1,dLat):
+            krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
+                                       ,df.Point((iLon+dLon, jLat+dLat))))
+            targetBoxes.append(krigeBox)
+else:
+    iLon=lon0
+    while iLon < lon1:
+        jLat=lat0
+        while jLat < lat1:
+            krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
+                                       ,df.Point((iLon+dLon, jLat+dLat))))
+            targetBoxes.append(krigeBox)
+            jLat += dLat
+        iLon += dLon
+        
 ###########################################################################
 if _debug:
     print('lon0,lon1,dLon: ',lon0,lon1,dLon)
