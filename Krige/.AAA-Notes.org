@@ -1,16 +1,24 @@
 
+These notes may not apply to your environment or system.
 
 * Environment Variables
 
 NOGGIN_DATA_SRC_DIRECTORY=/Users/mrilee/data/NOGGIN/
 
-PYTHONPATH=/Users/mrilee/Dropbox/NOGGIN/src/noggin-github-1/Krige
+PYTHONPATH=/Users/mrilee/git/NOGGIN-github/
+
+# And Krige is under the preceding.
 
 * Various notes
 
 ** 2018-0423-2136 Verified old code ran, produced visusals on new linux platorm.
 
 ** Dependencies
+
+** 2018-0824
+
+Scipy          > 1.0.0
+NOGGIn-PyKrige > 1.4.0
 
 ** As of 2018-0423
 
@@ -21,11 +29,14 @@ basemap
 numpy
 scipy
 HDF4
+h5py
+netCDF4
 
 In Fedora, via dnf 
 - redhat-rpm-config, python-basemap, hdf-devel, python2-devel, python2-numpy, python-scipy
 
-In Fedora, via pip
+*** In Fedora, now using NOGGIn's own pykrige (2018-0821-1522-16-EDT)
+**** In Fedora, via pip
 - pykrige
 
 

@@ -377,19 +377,25 @@ The shape of the orig_? arrays is used to format the datasets written to output 
         # elif self.type_hint == 'swath':
 
         # Some of the following code is set up to ease "gap filling".
+        # For gap filling, we want to put the kriged and original values
+        # into a single array. For a completely new grid, we may have
+        # no "orig" values that coincide with the target grid.
         if True:
             if (self.orig_z is None):
-                #  or (self.krg_z is None):
+                # Do we have original data co-located with kriged?
                 orig_and_krg = None
             else:
-                # orig_and_krg = np.zeros(self.orig_z.shape)
+                # Set up the target, concluding gap-filled array.
                 orig_and_krg = np.copy(self.orig_z)
             if self.krg_z is not None:
+                # Set up the grid for the kriged values. Note we're assuming 2D.
                 krg = np.zeros(self.krg_z.shape)
                 krg[:,:] = np.nan
             else:
+                # A little strange, but possible.
                 krg = None
             if self.krg_s is not None:
+                # The square of the variance.
                 s = np.zeros(self.krg_s.shape)
                 s[:,:] = np.nan
             else:
@@ -397,6 +403,7 @@ The shape of the orig_? arrays is used to format the datasets written to output 
 
         if True:
             if redimension:
+                # This is an attempt to cast an "irregular" dataset as a swath.
                 if (self.krg_x is not None) and (self.orig_x is not None):
                     for i in range(len(self.krg_x)):
                         x = self.krg_x[i]
@@ -407,13 +414,14 @@ The shape of the orig_? arrays is used to format the datasets written to output 
                         krg[idx[0],idx[1]] = self.krg_z[i]
                         s  [idx[0],idx[1]] = self.krg_s[i]
             else:
+                # If we have already have a grid, then the following should work.
                 x = self.krg_x
                 y = self.krg_y
                 krg = self.krg_z
                 s   = self.krg_s
                 
                 if orig_and_krg is not None:
-                    print('orig_and_krg')
+                    # print('orig_and_krg')
                     idx = np.where( np.isnan(orig_and_krg) )
                     # TODO check to see if krg_z and orig_z have the same shape
                     orig_and_krg[idx] = self.krg_z[idx]
@@ -1108,6 +1116,7 @@ The error estimate 'ss' is returned without modification from the OK calculation
                          ,random_permute       = random_permute\
                          ,coordinates_type     = coordinates_type\
                          ,log_calc             = log_calc\
+                         ,sampling             = sampling\
     )
     return krigeResults(s              = gridss\
                         ,z             = gridz\
@@ -1137,13 +1146,13 @@ class rectangular_grid(object):
     xy = None
 
     def __init__(self\
-                     ,x0 = -180.0\
-                     ,x1 =  180.0\
-                     ,dx =    1.0\
-                     ,y0 =  -90.0\
-                     ,y1 =   90.0\
-                     ,dy =    1.0\
-                     ):
+                 ,x0 = -180.0\
+                 ,x1 =  180.0\
+                 ,dx =    1.0\
+                 ,y0 =  -90.0\
+                 ,y1 =   90.0\
+                 ,dy =    1.0\
+    ):
         self.x0 = x0
         self.x1 = x1
         self.dx = dx
@@ -1151,8 +1160,10 @@ class rectangular_grid(object):
         self.y1 = y1
         self.dy = dy
 
+        # TODO Find a better way to lay out the grid.
         self.x1d = np.arange(self.x0,self.x1,self.dx)
         self.y1d = np.arange(self.y0,self.y1,self.dy)
+        
 
         self.xy = np.meshgrid( self.x1d, self.y1d )
 
@@ -1176,6 +1187,9 @@ class rectangular_grid(object):
 
     def gridxy1d(self):
         return self.x1d,self.y1d
+
+    def mnmx(self):
+        return [(np.nanmin(self.x),np.nanmax(self.x)),(np.nanmin(self.y),np.nanmax(self.y))]
     
 ####
 

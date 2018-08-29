@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """Krige all the given files in a directory to a grid.
 
 Example:
@@ -11,6 +12,9 @@ python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}
 python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2-1/ -n Water_Vapor_Infrared -m spherical -v -r 0.25 -R -b -90 -60 0.0 0.0
 
 2018-0808 ML Rilee, RSTLLC, mike@rilee.net
+
+© 2018 ML Rilee, RSTLLC, mike@rilee.net. GPLv2.
+
 """
 
 import argparse
@@ -35,6 +39,16 @@ from mpl_toolkits.basemap import Basemap
 from scipy.spatial import ConvexHull
 
 import pykrige.variogram_models as vm
+
+###########################################################################
+
+# https://stackoverflow.com/questions/21888406/getting-the-indexes-to-the-duplicate-columns-of-a-numpy-array
+def unique_columns2(data):
+    dt = np.dtype((np.void, data.dtype.itemsize * data.shape[0]))
+    dataf = np.asfortranarray(data).view(dt)
+    u,uind_fwd,uind,ucounts = np.unique(dataf, return_index=True, return_inverse=True, return_counts=True)
+    u = u.view(data.dtype).reshape(-1,data.shape[0]).T
+    return (u,uind_fwd,uind,ucounts)
 
 ###########################################################################
 
@@ -211,9 +225,12 @@ if _save_index:
     modis_BoundingBoxes_json = {}
 bb = df.BoundingBox()
 
+if _verbose:
+    print('noggin_krige: number of files to load: '+str(len(src_file_list)))
+
 for i in src_file_list:
     if _verbose:
-        print('loading '+str(i)+' from '+str(SRC_DIRECTORY))
+        print('noggin_krige: loading '+str(i)+' from '+str(SRC_DIRECTORY))
     modis_obj = df.DataField(\
                                 datafilename=i\
                                 ,datafieldname=DATAFIELDNAME\
@@ -313,6 +330,8 @@ if args.restrict_to_bounding_box:
 
 ###########################################################################
 
+
+# TODO: args.gap_fill may not be orthogonal to restrict_to_bounding_box -- maybe want both...
 elif args.gap_fill:
     dLon = 360
     dLat = 180
@@ -328,6 +347,7 @@ elif args.gap_fill:
 ##
 # else or if not args.restrict_to_bounding_box:
 # DEFAULT
+# TODO: Inject dependencies on these hardcoded parameters
 else:
     dLon = 120
     dLat = 10
@@ -355,7 +375,7 @@ else:
     targetBoxes.append(cap_south)
     
     cap_north = df.BoundingBox((df.Point((-180, 90-dLat))\
-                                ,df.Point((180, 90))))
+                                ,df.Point((180, 90+tgt_grid_dLat))))
     targetBoxes.append(cap_north)
 
 dSearchLon = dSearchScale*dLon
@@ -434,6 +454,7 @@ if np.abs(ny - int(ny)) > 1.0e-10:
 ###########################################################################
 
 # Construct individual tiles. Hope they line up with tgt_grid_full.
+k=0
 for krigeBox in targetBoxes:
     tile_lons,tile_lats = krigeBox.lons_lats()
     tile = Krige.rectangular_grid(\
@@ -444,7 +465,10 @@ for krigeBox in targetBoxes:
                                   ,y1 = tile_lats[1]\
                                   ,dy = tgt_grid_dLat\
     )
+    if True:
+        print('noggin_krige: k tile.mnmx: '+str(k)+', '+str(tile.mnmx()))
     targetTiles.append(tile)
+    k += 1
 
 ###########################################################################
     
@@ -470,6 +494,7 @@ for krigeBox in targetBoxes:
 
             if _verbose:
                 print 'loading iLon,jLat: '+str(iLon)+','+str(jLat)
+                print 'loading dLon,dLat: '+str(dLon)+','+str(dLat)
                 print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
             
             # krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
@@ -578,10 +603,45 @@ for krigeBox in targetBoxes:
                                       & (longitude > lon0) \
                                       & (longitude < lon1))
 
-            data1      = data[idx_source]
-            latitude1  = latitude[idx_source]
-            longitude1 = longitude[idx_source]
+            longitude_tmp = longitude[idx_source]
+            latitude_tmp  = latitude[idx_source]
+            data_tmp      = data[idx_source]
 
+            #### Average over duplicates... Experimental...
+            ulonlat, ulonlat_ind_fwd, ulonlat_ind, ulonlat_count = unique_columns2(np.vstack((longitude_tmp,latitude_tmp)))
+            if np.nanmax(ulonlat_count) > 1:
+                print('noggin_krige: found at least one duplicate!')
+                longitude_tmp1 = ulonlat[0]
+                latitude_tmp1  = ulonlat[1]
+                data_tmp1 = np.zeros(longitude_tmp1.shape[0])
+                for i in range(ulonlat_ind.size):
+                    data_tmp1[ulonlat_ind[i]] += data_tmp[i]/ulonlat_count[ulonlat_ind[i]]
+            else:
+                longitude_tmp1 = longitude_tmp
+                latitude_tmp1  = latitude_tmp
+                data_tmp1      = data_tmp
+
+            #### And the poles
+            longitude_mask = np.arange(longitude_tmp1.shape[0])
+            longitude_mask[np.where(latitude_tmp1 == -90)] = -1000
+            longitude_mask[np.where(latitude_tmp1 ==  90)] = -2000
+            ulonlat, ulonlat_ind_fwd,ulonlat_ind, ulonlat_count = unique_columns2(np.vstack((longitude_mask,latitude_tmp1)))
+            #??? ulonlat, ulonlat_ind, ulonlat_count = unique_columns2(latitude_tmp1)???
+            print('noggin_krige: np.nanmax(ulonlat_count): '+str(np.nanmax(ulonlat_count)))
+            print('100: '+str(len(np.where(latitude_tmp1 == -90))))
+            print('100: '+str(len(np.where(latitude_tmp1 ==  90))))
+            if np.nanmax(ulonlat_count) > 1:
+                print('noggin_krige: found at least one duplicate at a pole!')
+                latitude1  = ulonlat[1]
+                longitude1 = longitude_tmp1[ulonlat_ind_fwd]
+                data1 = np.zeros(longitude1.shape[0])
+                for i in range(ulonlat_ind.size):
+                    data1[ulonlat_ind[i]] += data_tmp1[i]/ulonlat_count[ulonlat_ind[i]]
+            else:
+                longitude1 = longitude_tmp1
+                latitude1  = latitude_tmp1
+                data1      = data_tmp1
+                
             #### See start of loop... grid = targetTiles[k]
             gridx,gridy = grid.gridxy()
 
@@ -640,6 +700,8 @@ for krigeBox in targetBoxes:
             npts_in = npts
             npts_increase_flag = True
             npts_last_kr_s     = 0
+
+            #### 
             
             while( True ):
                 if _verbose:
@@ -782,6 +844,20 @@ if True:
         
     variable_name   = krigeSketch_results[-1].zVariableName
 
+    # TODO: FIX: As a last-minute kluge put all of the files used into the final config.
+    # TODO: FIX: Copy items over to a special config to add below.
+
+    all_files_used=[]
+    for kr0 in krigeSketch_results:
+        all_files_used = all_files_used + kr0.config.files_loaded
+    krigeSketch_results[-1].config.files_loaded = list(set(all_files_used))
+
+    if _verbose:
+        print('noggin_krige: number of files loaded:     '+str(len(all_files_used)))
+        print('noggin_krige: number of individual files: '+str(len(krigeSketch_results[-1].config.files_loaded)))
+        if False:
+            print('noggin_krige: as json: '+krigeSketch_results[-1].config.as_json())
+    
     if not args.gap_fill:
         # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
         kHDF = Krige.krigeHDF(\
