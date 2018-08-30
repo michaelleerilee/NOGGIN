@@ -2,6 +2,10 @@
 
 NOGGIn/Krige
 
+GOAL: Krige swath data onto a target grid.
+
+Example: Krige an entire day of MODIS data to a regular lat-lon grid.
+
 NASA Open-Access Geo-Gridding Infrastructure (NOGGIn): An Integrated
 Service for Next-Generation Modeling, Analysis, and Retrieval
 Evaluation with Error Estimates
@@ -10,14 +14,9 @@ https://earthdata.nasa.gov/community/community-data-system-programs/access-proje
 
 PI: T. Clune, NASA Goddard Space Flight Center
 
-2018-0423-1438-29-EDT ML Rilee, RSTLLC, mike@rilee.net.
-
-GOAL: Krige swath data onto a target grid.
-
-Example: Krige an entire day of MODIS data to a regular lat-lon grid.
-
-
 --
+
+2018-0423-1438-29-EDT ML Rilee, RSTLLC, mike@rilee.net.
 
 2018-0830 ML Rilee, RSTLLC, mike@rilee.net
 
