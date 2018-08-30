@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
 Prepare a (MODIS, etc.) datafield for further processing using python tools. Provide a basic viewing capability.
 
