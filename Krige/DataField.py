@@ -25,6 +25,7 @@ from pyhdf.SD import SD, SDC
 import h5py as h5
 
 import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 from Krige import fig_generator, data_src_directory

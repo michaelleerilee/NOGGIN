@@ -11,6 +11,11 @@ python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}
 
 python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2-1/ -n Water_Vapor_Infrared -m spherical -v -r 0.25 -R -b -90 -60 0.0 0.0
 
+# Test a very coarse grid that does not align with the computational tiling.
+python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2/ -n Water_Vapor_Infrared -m gamma_rayleigh_nuggetless_variogram_model -r 8.0 -s 0.001 -x -v
+
+python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2/ -n Water_Vapor_Infrared -m gamma_rayleigh_nuggetless_variogram_model -r 9.0 -s 0.001 -x -v
+
 ------
 
 2018-0808 ML Rilee, RSTLLC, mike@rilee.net
@@ -36,11 +41,13 @@ from time import gmtime, strftime
 
 import Krige
 import Krige.DataField as df
+import DataField as df
 
 # from DataField import DataField, BoundingBox, df.Point, box_covering, Polygon, data_src_directory
 
 import numpy as np
 import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 
@@ -111,6 +118,12 @@ parser.add_argument('-v','--verbose'\
                     ,help='Toggle verbose printing')
 parser.set_defaults(verbose=False)
 
+parser.add_argument('-x','--debug'\
+                    ,dest='debug'\
+                    ,action='store_true'\
+                    ,help='Toggle debug printing')
+parser.set_defaults(debug=False)
+
 parser.add_argument('-r','--resolution'\
                     ,dest='grid_resolution'\
                     ,type=float\
@@ -178,13 +191,12 @@ if args.variogram_model is None:
 
 output_filename = args.output_filename
 _verbose = args.verbose
+_debug   = args.debug
 
 if _flag_error_exit:
     print('noggin_krige: error sys.exit(1)')
     sys.exit(1)
     
-_debug = False
-
 _save_index = False
 
 SRC_DIRECTORY=args.inputDirectory
@@ -251,8 +263,9 @@ for i in src_file_list:
         modis_BoundingBoxes_json[i]=modis_obj.bbox.to_json()
 
     if _debug:
-        print 'xml: ',bb.to_xml()
-        print 'json: ',bb.to_json()
+        print('noggin_krige:debug: loading '+str(i)+' from '+str(SRC_DIRECTORY))        
+        # print 'noggin_krige:debug:xml: ',bb.to_xml()
+        print 'noggin_krige:debug:json: ',bb.to_json()
 
 if _save_index:
     if _verbose:
@@ -383,7 +396,8 @@ else:
     targetBoxes.append(cap_south)
     
     cap_north = df.BoundingBox((df.Point((-180, 90-dLat))\
-                                ,df.Point((180, 90+tgt_grid_dLat))))
+                                ,df.Point((180, 90+1.0e-6))))
+#                                ,df.Point((180, 90+tgt_grid_dLat))))
     targetBoxes.append(cap_north)
 
 dSearchLon = dSearchScale*dLon
@@ -395,22 +409,30 @@ dSearchLat = dSearchScale*dLat
 # Add the other boxes.
 if type(lon0) is int and type(lon1) is int and type(dLon) is int\
    and type(lat0) is int and type(lat1) is int and type(dLat) is int:
+    print('noggin_krige:debug:box with integer parameters')
     for iLon in range(lon0,lon1,dLon):
         for jLat in range(lat0,lat1,dLat):
             krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
                                        ,df.Point((iLon+dLon, jLat+dLat))))
+            if _debug:
+                # print('box-latlon: ['+str(iLon)+', '+str(jLat)+'] ['+str(iLon+dLon)+', '+str(jLat+dLat)+']')
+                print(krigeBox.to_json())
             targetBoxes.append(krigeBox)
 else:
+    print('noggin_krige:debug:box with non-integer parameters')
     iLon=lon0
     while iLon < lon1:
         jLat=lat0
         while jLat < lat1:
             krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
                                        ,df.Point((iLon+dLon, jLat+dLat))))
+            if _debug:
+                # print('box-latlon: ['+str(iLon)+', '+str(jLat)+'] ['+str(iLon+dLon)+', '+str(jLat+dLat)+']')
+                print(krigeBox.to_json())
             targetBoxes.append(krigeBox)
             jLat += dLat
         iLon += dLon
-        
+# quit()
 ###########################################################################
 if _debug:
     print('lon0,lon1,dLon: ',lon0,lon1,dLon)
@@ -464,16 +486,25 @@ if np.abs(ny - int(ny)) > 1.0e-10:
 # Construct individual tiles. Hope they line up with tgt_grid_full.
 k=0
 for krigeBox in targetBoxes:
-    tile_lons,tile_lats = krigeBox.lons_lats()
+    kb_lons,kb_lats = krigeBox.lons_lats()
+    tile_lons_idx = np.where((kb_lons[0] <= tgt_X1d) & (tgt_X1d <= kb_lons[1]))
+    tile_lats_idx = np.where((kb_lats[0] <= tgt_Y1d) & (tgt_Y1d <= kb_lats[1]))   
+
+    # TODO May be inconsistent
     tile = Krige.rectangular_grid(\
-                                  x0 = tile_lons[0]\
-                                  ,x1 = tile_lons[1]\
+                                  x0  = np.nanmin(tgt_X1d[tile_lons_idx])\
+                                  ,x1 = np.nanmax(tgt_X1d[tile_lons_idx])\
                                   ,dx = tgt_grid_dLon\
-                                  ,y0 = tile_lats[0]\
-                                  ,y1 = tile_lats[1]\
+                                  ,x1d= tgt_X1d[tile_lons_idx]\
+                                  ,y0 = np.nanmin(tgt_Y1d[tile_lats_idx])\
+                                  ,y1 = np.nanmax(tgt_Y1d[tile_lats_idx])\
                                   ,dy = tgt_grid_dLat\
+                                  ,y1d= tgt_Y1d[tile_lats_idx]\
     )
-    if True:
+    # TODO fix this up so it would have its own class
+    # TODO if no target points are in the tile, then don't add it.
+    
+    if _debug:
         print('noggin_krige: k tile.mnmx: '+str(k)+', '+str(tile.mnmx()))
     targetTiles.append(tile)
     k += 1
@@ -508,7 +539,7 @@ for krigeBox in targetBoxes:
             # krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
             #                             ,df.Point((iLon+dLon, jLat+dLat))))
     
-            searchBox = df.BoundingBox((df.Point((iLon-dSearchLon,      max(-90, min(jLat-dSearchLat, 90))))\
+            searchBox = df.BoundingBox(( df.Point((iLon-dSearchLon,      max(-90, min(jLat-dSearchLat, 90))))\
                                         ,df.Point((iLon+dLon+dSearchLon, max(-90, min(jLat+dLat+dSearchLat, 90))))))
     
             # krigeBox = df.BoundingBox((df.Point((+135.0, 30.0))\
@@ -635,9 +666,10 @@ for krigeBox in targetBoxes:
             longitude_mask[np.where(latitude_tmp1 ==  90)] = -2000
             ulonlat, ulonlat_ind_fwd,ulonlat_ind, ulonlat_count = unique_columns2(np.vstack((longitude_mask,latitude_tmp1)))
             #??? ulonlat, ulonlat_ind, ulonlat_count = unique_columns2(latitude_tmp1)???
-            print('noggin_krige: np.nanmax(ulonlat_count): '+str(np.nanmax(ulonlat_count)))
-            print('100: '+str(len(np.where(latitude_tmp1 == -90))))
-            print('100: '+str(len(np.where(latitude_tmp1 ==  90))))
+            if _verbose:
+                print('noggin_krige: np.nanmax(ulonlat_count): '+str(np.nanmax(ulonlat_count)))
+                print(' where == -90: '+str(len(np.where(latitude_tmp1 == -90))))
+                print(' where == 90: '+str(len(np.where(latitude_tmp1 ==  90))))
             if np.nanmax(ulonlat_count) > 1:
                 print('noggin_krige: found at least one duplicate at a pole!')
                 latitude1  = ulonlat[1]
@@ -657,18 +689,16 @@ for krigeBox in targetBoxes:
             if args.gap_fill:
                 gridx  = longitude[idx_target]
                 gridy  = latitude [idx_target]
-            
-            in_grid = grid.in_grid(longitude1,latitude1)
-            ex_grid = grid.ex_grid(longitude1,latitude1)
 
-            if(len(in_grid[0]) == 0):
-                print('noggin_krige: len(in_grid[0]) == 0), no source data. continuing')
-                continue
-
+            # TODO This partis to flag and avoid dry firing.
+            in_grid = grid.in_grid(longitude1,latitude1,border=[dSearchLon,dSearchLat])
+            # ex_grid = grid.ex_grid(longitude1,latitude1)
             if _debug:
                 print('len(in_grid): '+str(len(in_grid)))
                 print('in_grid: '+str(in_grid))
-
+            if(len(in_grid[0]) == 0):
+                print('noggin_krige: len(in_grid[0]) == 0), no source data. continuing')
+                continue
             data_mx_in_grid = np.nanmax(data1[in_grid])
         
             # Calculate variogram
@@ -676,9 +706,12 @@ for krigeBox in targetBoxes:
             nlags=_drive_OKrige_nlags
             #
             dg = gridx.size
-            dx = Krige.span_array(gridx)
-            dy = Krige.span_array(gridy)
+            dx = max(Krige.span_array(gridx),dSearchLon)
+            dy = max(Krige.span_array(gridy),dSearchLat)
             dr = math.sqrt(dx*dx+dy*dy)
+
+            if _debug:
+                print('noggin_krige:dg,dx,dy,dr: ',dg,dx,dy,dr)
 
             beta0=1.5*(dr)
             lw_scale = 2.5
@@ -739,11 +772,16 @@ for krigeBox in targetBoxes:
                 
                 kr.title         = modis_obj.datafilename[0:17]  # TODO Cut up the data filename better
                 kr.zVariableName = modis_obj.datafieldname
+                kr_x_mn = np.nanmin(kr.x)
+                kr_x_mx = np.nanmax(kr.x)
+                kr_y_mn = np.nanmin(kr.y)
+                kr_y_mx = np.nanmax(kr.y)
                 kr_mx = np.nanmax(kr.z)
                 kr_s_mn = np.nanmin(kr.s)
                 kr_s_mx = np.nanmax(kr.s)
                 max_iter = max_iter - 1
                 print 'noggin_krige: kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid: ',kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid
+                print 'noggin_krige: kr mnmx x,y: ',kr_x_mn,kr_x_mx,kr_y_mn,kr_y_mx
                 if (max_iter < 1) or ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
                     if (max_iter < 1):
                         print '**'
@@ -835,6 +873,15 @@ if True:
     # The following is incorrect.
     i=0
     for kr in krigeSketch_results:
+        print('mnmx:lon,lat: ['\
+              +str(np.nanmin(kr.x))+', '\
+              +str(np.nanmax(kr.x))+']'\
+              +'['\
+              +str(np.nanmin(kr.y))+', '\
+              +str(np.nanmax(kr.y))+'] '\
+              +'kr.x.size: '+str(kr.x.size)\
+        )
+        i=i+1
         for k in range(kr.x.size):
             tgt_x_idx = np.where(np.abs(tgt_X1d - kr.x[k]) < 1.0e-10)
             tgt_y_idx = np.where(np.abs(tgt_Y1d - kr.y[k]) < 1.0e-10)

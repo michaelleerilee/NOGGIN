@@ -25,6 +25,7 @@ import h5py
 import json
 # from math import *
 import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from mpl_toolkits.basemap import Basemap
@@ -202,7 +203,6 @@ to store debugging information as well."""
                  ,z2=None,s2=None,x2=None,y2=None\
                  ,src_z=None,src_x=None,src_y=None\
                  ,dbg_z=None,dbg_x=None,dbg_y=None\
-                 ,hull=None\
                  ,box=None\
                  ,zVariableName="z"\
                  ,title='KrigeResultTitle'\
@@ -213,6 +213,7 @@ to store debugging information as well."""
                  ,log_calc=None\
                  ,note='Default note for krigeResults'\
                  ,config=None\
+                 ,construct_hull=False\
     ):
         self.clear()
         self.config = config
@@ -255,8 +256,6 @@ to store debugging information as well."""
         else:
             self.dbg = False
         self.title = title
-        if hull is not None:
-            self.hull = hull
         if box is not None:
             self.box = box.copy()
         else:
@@ -271,7 +270,8 @@ to store debugging information as well."""
         self.log_calc = log_calc
         self.note = str(note)
         self.sort_on_longitude()
-        self.construct_hull()
+        if construct_hull:
+            self.construct_hull()
     def sort_on_longitude_xyz(self):
         if self.x is not None \
            and self.y is not None \
@@ -1154,6 +1154,8 @@ class rectangular_grid(object):
     x  = None
     y  = None
     xy = None
+    x1d = None
+    y1d = None
 
     def __init__(self\
                  ,x0 = -180.0\
@@ -1162,6 +1164,8 @@ class rectangular_grid(object):
                  ,y0 =  -90.0\
                  ,y1 =   90.0\
                  ,dy =    1.0\
+                 ,x1d = None\
+                 ,y1d = None\
     ):
         self.x0 = x0
         self.x1 = x1
@@ -1169,23 +1173,31 @@ class rectangular_grid(object):
         self.y0 = y0
         self.y1 = y1
         self.dy = dy
+        self.x1d = x1d
+        self.y1d = y1d
+
+        # TODO Note that setting x1d, y1d and dx,dy etc. can be inconsistent. Need error check.
 
         # TODO Find a better way to lay out the grid.
-        self.x1d = np.arange(self.x0,self.x1,self.dx)
-        self.y1d = np.arange(self.y0,self.y1,self.dy)
-        
+        if x1d is None:
+            self.x1d = np.arange(self.x0,self.x1,self.dx)
 
+        if y1d is None:
+            self.y1d = np.arange(self.y0,self.y1,self.dy)
+
+        self.construct()
+
+    def construct(self):
         self.xy = np.meshgrid( self.x1d, self.y1d )
-
         # xy = np.meshgrid(np.arange(-120.0,-105.0,0.25),np.arange(  20.0,  25.0,0.25))
         self.x = np.ravel(self.xy[0])
         self.y = np.ravel(self.xy[1])
     
-    def in_grid(self,longitude,latitude):
+    def in_grid(self,longitude,latitude,border=[0,0]):
         return \
-          np.where(      (self.x0 < longitude) & (longitude < self.x1)\
-                             & (self.y0 < latitude ) & (latitude  < self.y1)\
-                            )
+          np.where(      (self.x0-border[0] < longitude) & (longitude < self.x1+border[0])\
+                       & (self.y0-border[1] < latitude ) & (latitude  < self.y1+border[1])\
+          )
     def ex_grid(self,longitude,latitude):
         return \
           np.where(      (self.x0 > longitude) | (longitude > self.x1)\
