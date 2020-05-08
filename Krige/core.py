@@ -25,7 +25,7 @@ import h5py
 import json
 # from math import *
 import matplotlib as mpl
-mpl.use('Agg')
+# mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from mpl_toolkits.basemap import Basemap
@@ -136,9 +136,9 @@ def adaptive_index(x0,y0,x,y,npts=100,beta0=200,frac=0.1,distribution='normal',l
             beta=beta*(1.0-frac)
             if beta/beta0 < 0.00001 or iter > max_iter:
                 # fail not so silently
-                print 'Krige.adaptive_index Too many iterations, beta too small.'\
+                print( 'Krige.adaptive_index Too many iterations, beta too small.'\
                     +' size='+str(idx_size)\
-                    +' iter='+str(iter)
+                    +' iter='+str(iter))
                 return idx                
                 # raise ValueError('Too many iterations, beta too small.'\
                 #                      +' size='+str(idx_size)\
@@ -557,6 +557,7 @@ type_hint == 'grid'  => Try to reinterpret the POINT (irregular) data grid type 
             if self.config is not None:
                 if self.s is not None:
                     variable_name = self.orig_name.split('/')[-1]+"_uncertainty"
+                    dt = np.dtype('<f8')
                     dset = grp_4.create_dataset(variable_name, (ny,nx), maxshape=(ny,nx), dtype=dt)
                     # initialize dataset values here
                     dset[:,:] = np.sqrt(self.s)
@@ -568,6 +569,7 @@ type_hint == 'grid'  => Try to reinterpret the POINT (irregular) data grid type 
                     
                     if (self.s is not None) and (self.krg is not None):
                         variable_name = self.orig_name.split('/')[-1]+"_relative_uncertainty"
+                        dt = np.dtype('<f8')
                         dset = grp_4.create_dataset(variable_name, (ny,nx), maxshape=(ny,nx), dtype=dt)
                         # initialize dataset values here
                         tmp = np.zeros(self.s.shape)
@@ -1083,31 +1085,34 @@ The error estimate 'ss' is returned without modification from the OK calculation
                 print('dok: parms: '+str(parms))
             variogram_parameters = list(parms)
 
-	    OK = OrdinaryKriging(     data_x1, data_y, data_z1\
-                                      ,variogram_model=variogram_model
-                                      ,variogram_parameters=variogram_parameters
-                                      ,variogram_function=variogram_function
-                                      ,nlags=nlags
-                                      ,weight=weight
-                                      ,enable_plotting=enable_plotting
-                                      ,enable_statistics=enable_statistics
-                                      ,verbose=verbose
-                                      ,coordinates_type=coordinates_type
-                                      )
+        OK = OrdinaryKriging(     data_x1, data_y, data_z1\
+                                  ,variogram_model=variogram_model
+                                  ,variogram_parameters=variogram_parameters
+                                  ,variogram_function=variogram_function
+                                  ,nlags=nlags
+                                  ,weight=weight
+                                  ,enable_plotting=enable_plotting
+                                  ,enable_statistics=enable_statistics
+                                  ,verbose=verbose
+                                  ,coordinates_type=coordinates_type
+        )
             
-	    z, ss = OK.execute('points',g_lon,g_lat,backend=backend)
+        z, ss = OK.execute('points',g_lon,g_lat,backend=backend)
 
-            if verbose:
-                print('driveOKrige i_target_portion.size,mnmx(ln(z)): ',len(i_target_portion),np.nanmin(z),np.nanmax(z))
-                # print('driveOKrige i_target_portion,mnmx(ln(z)): ',i_target_portion,np.nanmin(z),np.nanmax(z))
-            if log_calc:
-	        gridz [i_target_portion] = np.exp(z[:])
-                # For the following, refer to Bevington, p64, 1969.
-	        gridss[i_target_portion] = ss[:]
-                gridss = gridss * ( gridz ** 2 )
-            else:
-	        gridz [i_target_portion] = z[:]
-	        gridss[i_target_portion] = ss[:]
+        if verbose:
+            print('driveOKrige i_target_portion.size,mnmx(ln(z)): ',len(i_target_portion),np.nanmin(z),np.nanmax(z))
+            # print('driveOKrige i_target_portion,mnmx(ln(z)): ',i_target_portion,np.nanmin(z),np.nanmax(z))
+        if log_calc:
+            gridz [i_target_portion] = np.exp(z[:])
+            # For the following, refer to Bevington, p64, 1969.
+            gridss[i_target_portion] = ss[:]
+            # gridss[i_target_portion] = gridss[i_target_portion] * ( gridz[i_target_portion] ** 2 )
+        else:
+            gridz [i_target_portion] = z[:]
+            gridss[i_target_portion] = ss[:]
+
+    if log_calc:
+        gridss = gridss * ( gridz ** 2 )
 
     # TODO Need to return gridss
     if verbose:
@@ -1422,8 +1427,8 @@ def data_src_directory():
 
 if __name__ == '__main__':
     print
-    print 'Krige version:   ',Krige.__version__
-    print 'PyKrige version: ',pykrige.__version__
+    print( 'Krige version:   ',Krige.__version__)
+    print( 'PyKrige version: ',pykrige.__version__)
     if False:
         fig_gen = fig_generator(1,1)
         fig_gen.increment_figure()

@@ -25,7 +25,7 @@ from pyhdf.SD import SD, SDC
 import h5py as h5
 
 import matplotlib as mpl
-mpl.use('Agg')
+# mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 from Krige import fig_generator, data_src_directory
@@ -136,8 +136,8 @@ class Point(object):
         """A point on the sphere."""
     def __init__(self,lonlat_degrees=None,latlon_degrees=None):
         """Make a point from a tuple or the individual lat and lon"""
-        assert not isinstance(lonlat_degrees,basestring)
-        assert not isinstance(latlon_degrees,basestring)
+        assert not isinstance(lonlat_degrees,str)
+        assert not isinstance(latlon_degrees,str)
         if lonlat_degrees is not None:
             self.lon_degrees = lonlat_degrees[0]
             self.lat_degrees  = lonlat_degrees[1]
@@ -430,15 +430,15 @@ custom_loader=None.  A callable(self) that allows a user to write a
             elif self.datafilename[3:5] == '08':
                 self.load08()
             else:
-                print 'failed loading '+self.datafilename
-                print 'loading type '+self.datafilename[0:5]+' not supported. returning...'
+                print( 'failed loading '+self.datafilename)
+                print( 'loading type '+self.datafilename[0:5]+' not supported. returning...')
                 return
         elif self.datafilename[0:3] in ["OMI"]:
             # How did OMI get in a MODIS object?
             self.loadOMI_L3()
         else:
-            print 'failed loading '+self.datafilename
-            print 'loading type '+self.datafilename[0:3]+' not supported. returning...'
+            print( 'failed loading '+self.datafilename)
+            print( 'loading type '+self.datafilename[0:3]+' not supported. returning...')
 
 
     def load05(self):
@@ -450,7 +450,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
         self.colormesh_title = self.datafilename
 
         # TODO MLR There must be a better way to get this information!!!
-        # print 'ds-keys: ',ds.dimensions().keys()
+        # print( 'ds-keys: ',ds.dimensions().keys())
         if "Cell_Along_Swath_1km:mod05" in ds.dimensions().keys():
             # Need to load geolocation data from MOD03
             if self.geofile == "":
@@ -512,8 +512,8 @@ custom_loader=None.  A callable(self) that allows a user to write a
         hdf = SD(self.srcdirname+self.datafilename, SDC.READ)
         ds  = hdf.select(self.datafieldname)
 
-        print 'load08'
-        print 'ds.dimensions(): ',ds.dimensions()
+        print( 'load08')
+        print( 'ds.dimensions(): ',ds.dimensions())
 
         # long_name="Atmospheric_Water_Vapor_Mean"
         ### TODO Maybe these do not need to be fields, just local vars
@@ -524,16 +524,16 @@ custom_loader=None.  A callable(self) that allows a user to write a
         
         nAlong  = ds.dimensions()[self.key_along]
         nAcross = ds.dimensions()[self.key_across]
-        print '0 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross)
+        print( '0 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
 
         data = np.zeros((nAlong,nAcross))
-        print 'a data.shape:     '+str(data.shape)
-        print 'd ds.data.shape:  '+str(ds[:,:].astype(np.double).shape)
+        print( 'a data.shape:     '+str(data.shape))
+        print( 'd ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
         
         data = ds[0:nAlong,0:nAcross].astype(np.double)
 
-        print '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross)
-        print '2 data.shape:     '+str(data.shape)
+        print( '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
+        print( '2 data.shape:     '+str(data.shape))
         
         attrs        = ds.attributes(full=1)
         lna          = attrs["long_name"]
@@ -564,10 +564,10 @@ custom_loader=None.  A callable(self) that allows a user to write a
             lon = hdf.select('XDim')
             # lon is 1d, since 08 is a grid
             # self.longitude = lon[:,:]
-            print 'type(lon): '+str(type(lon))
-            print 'type(lat): '+str(type(lat))
-            print 'lon.shape: '+str(lon[:].shape)
-            print 'lat.shape: '+str(lat[:].shape)
+            print( 'type(lon): '+str(type(lon)))
+            print( 'type(lat): '+str(type(lat)))
+            print( 'lon.shape: '+str(lon[:].shape))
+            print( 'lat.shape: '+str(lat[:].shape))
             
             self.longitude,self.latitude = np.meshgrid(lon[:],lat[:])
                                            
@@ -582,7 +582,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
 
         # e.g. http://hdfeos.org/software/h5py.php
         # TODO: Consider netCDF4 vs. h5py
-        print 'loadOMI_L3'
+        print( 'loadOMI_L3')
         
         with h5.File(self.srcdirname+self.datafilename, mode='r') as hdf:
 
@@ -592,7 +592,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
             ds  = hdf[self.datafieldname]
 
             # print 'hdf.keys: ',hdf.keys()
-            print 'ds.attrs.keys: ',ds.attrs.keys()
+            print( 'ds.attrs.keys: ',ds.attrs.keys())
 
             # long_name="Atmospheric_Water_Vapor_Mean"
             ### TODO Maybe these do not need to be fields, just local vars
@@ -609,31 +609,31 @@ custom_loader=None.  A callable(self) that allows a user to write a
             lat = np.arange( -90.0, 90.0, 1.0)
             lon = np.arange(-180.0, 180.0, 1.0)
 
-            print 'type(lon): '+str(type(lon))
-            print 'type(lat): '+str(type(lat))
-            print 'lon.shape: '+str(lon[:].shape)
-            print 'lat.shape: '+str(lat[:].shape)
+            print( 'type(lon): '+str(type(lon)))
+            print( 'type(lat): '+str(type(lat)))
+            print( 'lon.shape: '+str(lon[:].shape))
+            print( 'lat.shape: '+str(lat[:].shape))
             
             self.longitude,self.latitude = np.meshgrid(lon[:],lat[:])
             
             self.bbox = box_covering(self.longitude,self.latitude\
                                      ,hack_branchcut_threshold=self.hack_branchcut_threshold\
             )
-            print 'longitude.shape: ',self.longitude.shape
-            print 'latitude.shape:  ',self.latitude.shape
+            print( 'longitude.shape: ',self.longitude.shape)
+            print( 'latitude.shape:  ',self.latitude.shape)
             
             nAlong  = len(lat)
             nAcross = len(lon)
-            print '0 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross)
+            print( '0 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
 
             data = np.zeros((nAlong,nAcross))
-            print 'a data.shape:     '+str(data.shape)
-            print 'd ds.data.shape:  '+str(ds[:,:].astype(np.double).shape)
+            print( 'a data.shape:     '+str(data.shape))
+            print( 'd ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
             
             data = ds[0:nAlong,0:nAcross].astype(np.double)
 
-            print '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross)
-            print '2 data.shape:     '+str(data.shape)
+            print( '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
+            print( '2 data.shape:     '+str(data.shape))
         
             # attrs        = ds.attributes(full=1)
             attrs        = ds.attrs
@@ -649,24 +649,24 @@ custom_loader=None.  A callable(self) that allows a user to write a
             ua           = attrs[self.key_units]
             self.units        = ua[0]
 
-            print 'aoa: ',aoa
-            print 'fva: ',fva
-            print 'sfa: ',sfa
-            print 'vra: ',vra
-            print 'ua:  ',ua
+            print( 'aoa: ',aoa)
+            print( 'fva: ',fva)
+            print( 'sfa: ',sfa)
+            print( 'vra: ',vra)
+            print( 'ua:  ',ua)
 
-            print '0 mnmx(data): ',np.nanmin(data),np.nanmax(data)
+            print( '0 mnmx(data): ',np.nanmin(data),np.nanmax(data))
 
             invalid = np.logical_or(data > valid_max, data < valid_min)
             invalid = np.logical_or(invalid,data == _FillValue)
 
             data[invalid] = np.nan
-            print '1 mnmx(data): ',np.nanmin(data),np.nanmax(data)
+            print( '1 mnmx(data): ',np.nanmin(data),np.nanmax(data))
 
             # Not sure about the following. Cribbed from MODIS approach.
             data = (data - add_offset) * scale_factor
             self.data = np.ma.masked_array(data, np.isnan(data))
-            print '2 mnmx(self.data): ',np.nanmin(self.data),np.nanmax(self.data)
+            print( '2 mnmx(self.data): ',np.nanmin(self.data),np.nanmax(self.data))
 
     def init_basemap(self,ax=None,wh_scale=None\
                          ,lat_center=None, lon_center=None

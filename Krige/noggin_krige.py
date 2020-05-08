@@ -3,11 +3,17 @@
 """Krige all the given files in a directory to a grid.
 
 Examples:
-python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2/ -n Water_Vapor_Infrared -m gamma_rayleigh_nuggetless_variogram_model -v
 
+## THE FOLLOWING IS A GOOD FIRST EXAMPLE FOR A SMALLER MACHINE
 python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MYD08_D3/ -n Atmospheric_Water_Vapor_Mean -m gamma_rayleigh_nuggetless_variogram_model -v -G
 
+python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2/ -n Water_Vapor_Infrared -m gamma_rayleigh_nuggetless_variogram_model -v
+
 python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2-1/ -n Water_Vapor_Infrared -m spherical -v -r 0.25 -R
+
+python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2-1/ -n Water_Vapor_Infrared -m spherical -v -r 0.25 -R -b -50 -50 -40 -40
+
+python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2-1/ -n Water_Vapor_Infrared -m gamma_rayleigh_nuggetless_variogram_model -v -r 0.25 -R -b -50 -50 -40 -40
 
 python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}MODIS-61-MOD05_L2-1/ -n Water_Vapor_Infrared -m spherical -v -r 0.25 -R -b -90 -60 0.0 0.0
 
@@ -46,12 +52,13 @@ import DataField as df
 # from DataField import DataField, BoundingBox, df.Point, box_covering, Polygon, data_src_directory
 
 import numpy as np
+from scipy.spatial import ConvexHull
+
 import matplotlib as mpl
-mpl.use('Agg')
+# mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
-
-from scipy.spatial import ConvexHull
+from Krige import fig_generator
 
 import pykrige.variogram_models as vm
 
@@ -214,6 +221,7 @@ _drive_OKrige_weight            = False
 _drive_OKrige_verbose           = args.verbose
 _drive_OKrige_eps               = 1.0e-10 # Not well implemented
 _drive_OKrige_backend           = 'vectorized'
+# _drive_OKrige_backend           = 'loop' # Same error pattern as vectorized
 
 # tgt_grid_dLon = 0.5; tgt_grid_dLat = 0.5
 # These might conflict with GapFill.
@@ -265,11 +273,11 @@ for i in src_file_list:
     if _debug:
         print('noggin_krige:debug: loading '+str(i)+' from '+str(SRC_DIRECTORY))        
         # print 'noggin_krige:debug:xml: ',bb.to_xml()
-        print 'noggin_krige:debug:json: ',bb.to_json()
+        print('noggin_krige:debug:json: ',bb.to_json())
 
 if _save_index:
     if _verbose:
-        print 'writing to '+INDEX_FILE
+        print('writing to '+INDEX_FILE)
         # with open(SRC_DIRECTORY+'modis_BoundingBoxes.json','w') as f:
     with open(INDEX_FILE,'w') as f:
         json.dump(modis_BoundingBoxes_json,f)
@@ -370,8 +378,8 @@ elif args.gap_fill:
 # DEFAULT
 # TODO: Inject dependencies on these hardcoded parameters
 else:
-    dLon = 120
-    dLat = 10
+    # default dLon = 120; dLat = 10
+    dLon = 120; dLat = 40
     # dSearchScale = 0.75
     dSearchScale = 0.25 # Amount beyond the tile to search for granules.
     # Full
@@ -409,7 +417,8 @@ dSearchLat = dSearchScale*dLat
 # Add the other boxes.
 if type(lon0) is int and type(lon1) is int and type(dLon) is int\
    and type(lat0) is int and type(lat1) is int and type(dLat) is int:
-    print('noggin_krige:debug:box with integer parameters')
+    if _debug:
+        print('noggin_krige:debug:box with integer parameters')
     for iLon in range(lon0,lon1,dLon):
         for jLat in range(lat0,lat1,dLat):
             krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
@@ -508,6 +517,8 @@ for krigeBox in targetBoxes:
         print('noggin_krige: k tile.mnmx: '+str(k)+', '+str(tile.mnmx()))
     targetTiles.append(tile)
     k += 1
+    # if k > 18:
+    #     break
 
 ###########################################################################
     
@@ -516,14 +527,17 @@ for krigeBox in targetBoxes:
     
 k=-1
 for krigeBox in targetBoxes:
-    for dummy in [1]:
-        k=k+1
+    k=k+1
+    print( 'fetching tile = '+str(k))
+    if k < len(targetTiles):
+    # for dummy in [1]:
+# check k for debug        
         grid = targetTiles[k]
         _calculate = True
         _enable_statistics = _drive_OKrige_enable_statistics
         if _calculate:
             if _verbose:
-                print 'working on tile = '+str(k)
+                print( 'working on tile = '+str(k))
 
             iLon=krigeBox.p0.lon_degrees
             jLat=krigeBox.p0.lat_degrees
@@ -532,9 +546,9 @@ for krigeBox in targetBoxes:
             dLat=krigeBox.p1.lat_degrees-krigeBox.p0.lat_degrees
 
             if _verbose:
-                print 'loading iLon,jLat: '+str(iLon)+','+str(jLat)
-                print 'loading dLon,dLat: '+str(dLon)+','+str(dLat)
-                print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
+                print( 'loading iLon,jLat: '+str(iLon)+','+str(jLat))
+                print( 'loading dLon,dLat: '+str(dLon)+','+str(dLat))
+                print( strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime()))
             
             # krigeBox = df.BoundingBox((df.Point((iLon, jLat))\
             #                             ,df.Point((iLon+dLon, jLat+dLat))))
@@ -552,7 +566,8 @@ for krigeBox in targetBoxes:
             # Find overlapping granules and load the MODIS objects
             src_data   = {}
             modis_objs = []
-            for i,v in boxes.iteritems():
+            # for i,v in boxes.iteritems():
+            for i,v in boxes.items():
                 i = str(i)
                 # if i[0:3] in _load_datasets: # Check to see if we're loading something DataField knows about.
                 if True:
@@ -574,7 +589,7 @@ for krigeBox in targetBoxes:
                                         src_data[i] = v
                                         # load the data
                                         if _verbose:
-                                            print 'loading '+i+' from '+SRC_DIRECTORY
+                                            print( 'loading '+i+' from '+SRC_DIRECTORY)
                                             # print 'type(i): '+str(type(i))
                                         modis_obj = df.DataField(\
                                                                  datafilename=i\
@@ -725,7 +740,7 @@ for krigeBox in targetBoxes:
                 npts = lores_npts
 
             if _verbose:
-                print 'npts( '+str(k)+' ) = '+str(npts)
+                print( 'npts( '+str(k)+' ) = '+str(npts))
             
             marker_size = 3.5
             m_alpha = 1.0
@@ -746,7 +761,7 @@ for krigeBox in targetBoxes:
             
             while( True ):
                 if _verbose:
-                    print 'npts_in( '+str(k)+' ) = '+str(npts_in)
+                    print( 'npts_in( '+str(k)+' ) = '+str(npts_in))
                 kr=0
                 kr=Krige.drive_OKrige(\
                                        grid_stride=dg\
@@ -769,6 +784,9 @@ for krigeBox in targetBoxes:
                                        ,eps=_drive_OKrige_eps\
                                        ,backend=_drive_OKrige_backend\
                 )
+
+                print('kr.z.shape,strides: ',kr.z.shape,kr.z.strides)
+                print('kr.s.shape,strides: ',kr.s.shape,kr.s.strides)
                 
                 kr.title         = modis_obj.datafilename[0:17]  # TODO Cut up the data filename better
                 kr.zVariableName = modis_obj.datafieldname
@@ -780,22 +798,22 @@ for krigeBox in targetBoxes:
                 kr_s_mn = np.nanmin(kr.s)
                 kr_s_mx = np.nanmax(kr.s)
                 max_iter = max_iter - 1
-                print 'noggin_krige: kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid: ',kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid
-                print 'noggin_krige: kr mnmx x,y: ',kr_x_mn,kr_x_mx,kr_y_mn,kr_y_mx
+                print( 'noggin_krige: kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid: ',kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid)
+                print( 'noggin_krige: kr mnmx x,y: ',kr_x_mn,kr_x_mx,kr_y_mn,kr_y_mx)
                 if (max_iter < 1) or ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
                     if (max_iter < 1):
-                        print '**'
+                        print( '**')
                         if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
-                            print '*** max_iter exceeded, continuing to next tile'
+                            print( '*** max_iter exceeded, continuing to next tile')
                         else:
-                            print '*** max_iter exceeded, kriging probably diverged, continuing to next tile'
+                            print( '*** max_iter exceeded, kriging probably diverged, continuing to next tile')
                     if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
-                        print '**'
-                        print '*** kriging seems to have converged'
+                        print( '**')
+                        print( '*** kriging seems to have converged')
                     break
                 else:
-                    print '***'
-                    print '*** kriging diverged, changing npts, iter: ',max_iter_start-1-max_iter
+                    print( '***')
+                    print( '*** kriging diverged, changing npts, iter: ',max_iter_start-1-max_iter)
 
                     # s_mn should be positive, hopefully small
                     if np.abs(kr_s_mn) > npts_last_kr_s:
@@ -811,15 +829,15 @@ for krigeBox in targetBoxes:
                         
                     # if np.inf in kr.z:
                     #     if inf_detected:
-                    #         print 'inf detected again, increasing npts'
+                    #         print( 'inf detected again, increasing npts')
                     #         npts_in = npts_in*npts_increase_factor
                     #         inf_detected = False
                     #     else:
-                    #         print 'inf detected, reducing npts'
+                    #         print( 'inf detected, reducing npts')
                     #         npts_in = npts_in*0.75
                     #         inf_detected = True
                     # else:
-                    #     print 'increasing npts'
+                    #     print( 'increasing npts')
                     #     npts_in = npts_in*npts_increase_factor
                                  
             kr.config.parent_command = sys.argv
@@ -829,19 +847,19 @@ for krigeBox in targetBoxes:
             krigeSketch_results.append(kr)
 
             if _verbose:
-                print 'k,mnmx(gridz): '+str(k)\
+                print( 'k,mnmx(gridz): '+str(k)\
                     +', ( '+str(np.nanmin(krigeSketch_results[-1].z))\
-                    +', '+str(np.nanmax(krigeSketch_results[-1].z))+' )'
+                    +', '+str(np.nanmax(krigeSketch_results[-1].z))+' )')
     
 
 if _verbose:
     l=0
     for k in krigeSketch_results:
-        print 'mnmx(k): '+str(l)+': ( '+str(np.nanmin(k.z))+' '+str(np.nanmax(k.z))+str(' )')
+        print( 'mnmx(k): '+str(l)+': ( '+str(np.nanmin(k.z))+' '+str(np.nanmax(k.z))+str(' )'))
         l=l+1
     l=0
     for k in krigeSketch_results:
-        print 'vg_parm: '+str(l)+': '+str(k.vg_parameters)
+        print( 'vg_parm: '+str(l)+': '+str(k.vg_parameters))
         l=l+1
 
 # plot_configuration = Krige.krigePlotConfiguration(source_data              = False\
@@ -958,11 +976,23 @@ if True:
     kHDF.save()
     print('noggin_krige: finished saving to HDF')
 
-print strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
-end_time = time.time()
-print 'wall clock run time (sec) = '+str(end_time-start_time)
+    # Display results
+    fig_gen = fig_generator(1,1)
+    display_obj = df.DataField(\
+                            data = s\
+                            ,longitude = x\
+                            ,latitude  = y\
+                            )
+#                            ,longitude = tgt_X1d\
+#                            ,latitude  = tgt_Y1d\
+    display_obj.scatterplot(title='s',colorbar=True,marker_size=7)
+    plt.show()
 
-print 'noggin_krige done'
+print( strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime()))
+end_time = time.time()
+print( 'wall clock run time (sec) = '+str(end_time-start_time))
+
+print( 'noggin_krige done')
 
 
 
