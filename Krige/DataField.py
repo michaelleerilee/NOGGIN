@@ -27,10 +27,27 @@ import h5py as h5
 import matplotlib as mpl
 # mpl.use('Agg')
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
+# import matplotlib.tri as tri
+
+import cartopy.crs as ccrs
+# from mpl_toolkits.basemap import Basemap
+
 from Krige import fig_generator, data_src_directory
 
 import unittest
+
+class FigAxContainer(object):
+    def __init__(self,figax):
+        self.fig = figax[0]
+        self.ax  = figax[1]
+        return
+
+    def add_coastlines(self,set_global=None):
+        set_global = (False if set_global is None else set_global)
+        if set_global:
+            self.ax.set_global()
+        self.ax.add_feature(cf.COASTLINE,linewidth=0.5, edgecolor='k')
+        return self
 
 class Interval(object):
     def __init__(self):
@@ -377,7 +394,12 @@ class DataField(object):
     units      ='units'
     nAlong  = 0
     nAcross = 0
-    m = None
+
+    # fig = None
+    ax     = None
+    proj   = None
+    transf = None
+    
     colormesh_title = 'colormesh_title'
     long_name = 'long_name'
 
@@ -668,12 +690,23 @@ custom_loader=None.  A callable(self) that allows a user to write a
             self.data = np.ma.masked_array(data, np.isnan(data))
             print( '2 mnmx(self.data): ',np.nanmin(self.data),np.nanmax(self.data))
 
-    def init_basemap(self,ax=None,wh_scale=None\
-                         ,lat_center=None, lon_center=None
-                         ):
+    def init_viz(self\
+                     ,figax=None
+                     ,wh_scale=None
+                     ,lat_center=None, lon_center=None
+                     ,plot_options = None
+                     ,proj   = None
+                     ,transf = None
+                     ):
         """
-        Initialize basemap visualization.
+        Initialize visualization.
         """
+        self.figax  = (FigAxContainer(plt.subplots(1, subplot_kw=plot_options)) if figax is None else figax)
+        self.plot_options = ({'projection': ccrs.PlateCarree(), 'transform': ccrs.Geodetic()} if plot_options is None else plot_options)
+
+        self.proj   = (ccrs.PlateCarree() if proj is None else proj)
+        self.transf = (ccrs.Geodetic() if transf is None else transf)
+        
         if lat_center is None:
             self.plot_lat_m_center = np.nanmean(self.latitude)
         else:
@@ -692,7 +725,9 @@ custom_loader=None.  A callable(self) that allows a user to write a
                              ,ax=ax\
                              ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center\
                              ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
-        
+
+        # self.ax.set_global()
+        self.ax.coastlines()
         self.m.drawcoastlines(linewidth=0.5)
         self.m.drawparallels(np.arange(-90.0, 91., 10.), labels=[1, 0, 0, 0])
         self.m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
