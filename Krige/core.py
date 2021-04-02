@@ -28,7 +28,7 @@ import matplotlib as mpl
 # mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
-from mpl_toolkits.basemap import Basemap
+# from mpl_toolkits.basemap import Basemap
 import numpy as np
 
 from pyhdf.SD import SD, SDC

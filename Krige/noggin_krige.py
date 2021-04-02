@@ -57,7 +57,7 @@ from scipy.spatial import ConvexHull
 import matplotlib as mpl
 # mpl.use('Agg')
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
+# from mpl_toolkits.basemap import Basemap
 from Krige import fig_generator
 
 import pykrige.variogram_models as vm
