@@ -244,9 +244,16 @@ else:
 ###########################################################################
 # Start with MetaData sketch.
 # Construct bounding box index.
-src_file_list = [f for f in os.listdir(SRC_DIRECTORY) if (lambda x: '.hdf' in x or '.HDF.' in x)(f)]
+src_file_list = [f for f in os.listdir(SRC_DIRECTORY)
+                     if (lambda x:
+                             '.hdf' in x
+                             or '.HDF.' in x
+                             or '.he5' in x
+                             or '.h5' in x
+                             or '.nc' in x
+                             )(f)]
 if len(src_file_list) == 0:
-    print('noggin_krige: eror: no HDF files found in '+SRC_DIRECTORY+', exiting')
+    print('noggin_krige: error: no HDF files found in '+SRC_DIRECTORY+', exiting')
     sys.exit(1)
 modis_BoundingBoxes = {}
 if _save_index:
@@ -600,8 +607,9 @@ for krigeBox in targetBoxes:
                                         modis_objs.append(modis_obj)
     
             #
-            # Get the sizes, allocate the arrays, and then fill them
-            sizes_modis_objs      = [ m.data.size for m in modis_objs ]
+            # Get the (slice) sizes, allocate the arrays, and then fill them
+            # sizes_modis_objs      = [ m.data.size for m in modis_objs ]
+            sizes_modis_objs      = [ m.slice_size for m in modis_objs ]
             total_size_modis_objs = sum(sizes_modis_objs)
 
             if _sampling_fraction is not None:
@@ -614,12 +622,16 @@ for krigeBox in targetBoxes:
             latitude  = np.zeros(total_size_modis_objs)
             longitude = np.zeros(total_size_modis_objs)
  
+            islice = 0
             i0=0
             for i in range(len(sizes_modis_objs)):
                 i1 = i0 + sizes_modis_objs[i]
                 if _verbose:
                     print('adding indexes: ', i0, i1)
-                data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel()
+                if len(modis_objs[i].data.shape) == 3:
+                    data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel_slice(islice)
+                else:
+                    data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel()
                 i0=i1
 
             # # The data have been loaded. You can search for duplicates now.

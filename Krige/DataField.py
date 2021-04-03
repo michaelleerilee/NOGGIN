@@ -23,6 +23,7 @@ import os
 import numpy as np
 from pyhdf.SD import SD, SDC
 import h5py as h5
+from netCDF4 import Dataset
 
 import matplotlib as mpl
 # mpl.use('Agg')
@@ -395,6 +396,8 @@ class DataField(object):
     nAlong  = 0
     nAcross = 0
 
+    slice_size = 0
+
     # fig = None
     ax     = None
     proj   = None
@@ -457,7 +460,15 @@ custom_loader=None.  A callable(self) that allows a user to write a
                 return
         elif self.datafilename[0:3] in ["OMI"]:
             # How did OMI get in a MODIS object?
-            self.loadOMI_L3()
+            if "L3" in self.datafilename:
+                self.loadOMI_L3()
+            elif "L2" in self.datafilename:
+                self.loadOMI_L2()
+            else:
+                print( 'failed loading '+self.datafilename)
+                print( 'loading type '+self.datafilename[0:5]+' not supported. returning...')
+                return
+                
         else:
             print( 'failed loading '+self.datafilename)
             print( 'loading type '+self.datafilename[0:3]+' not supported. returning...')
@@ -493,6 +504,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
 
         data = np.zeros((nAlong,nAcross))
         data = ds[0:nAlong,0:nAcross].astype(np.double)
+        self.slice_size = nAlong*nAcross
         
         attrs        = ds.attributes(full=1)
         lna          = attrs["long_name"]
@@ -553,6 +565,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
         print( 'd ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
         
         data = ds[0:nAlong,0:nAcross].astype(np.double)
+        self.slice_size=nAlong*nAcross
 
         print( '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
         print( '2 data.shape:     '+str(data.shape))
@@ -653,6 +666,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
             print( 'd ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
             
             data = ds[0:nAlong,0:nAcross].astype(np.double)
+            self.slice_size = nAlong*nAcross
 
             print( '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
             print( '2 data.shape:     '+str(data.shape))
@@ -690,47 +704,158 @@ custom_loader=None.  A callable(self) that allows a user to write a
             self.data = np.ma.masked_array(data, np.isnan(data))
             print( '2 mnmx(self.data): ',np.nanmin(self.data),np.nanmax(self.data))
 
+    def loadOMI_L2(self):
+
+        # e.g. http://hdfeos.org/software/h5py.php
+        # TODO: Consider netCDF4 vs. h5py
+        print( 'loadOMI_L2')
+        
+        with h5.File(self.srcdirname+self.datafilename, mode='r') as hdf:
+
+            if self.geofile != "":
+                raise NotImplementedError('separate geofile with location information not implemented!')
+
+            print('ds: ',hdf['HDFEOS/SWATHS'].keys())
+            print('  : ',hdf['HDFEOS/SWATHS/O3Profile/'].keys())
+            
+            ds  = hdf[self.datafieldname]
+
+            # print 'hdf.keys: ',hdf.keys()
+            print( 'ds.attrs.keys: ',ds.attrs.keys())
+
+            # long_name="Atmospheric_Water_Vapor_Mean"
+            ### TODO Maybe these do not need to be fields, just local vars
+                        
+            # :NumberOfLongitudesInGrid
+
+            self.key_along  = ''
+            self.key_across = ''
+            self.colormesh_title = self.datafilename
+            self.key_units = 'Units'
+
+            lat = hdf['HDFEOS/SWATHS/O3Profile/Geolocation Fields/Latitude']
+            lon = hdf['HDFEOS/SWATHS/O3Profile/Geolocation Fields/Longitude']
+
+            print( 'type(lon): '+str(type(lon)))
+            print( 'type(lat): '+str(type(lat)))
+            print( 'lon.shape: '+str(lon[:].shape))
+            print( 'lat.shape: '+str(lat[:].shape))
+            
+            # self.longitude,self.latitude = np.meshgrid(lon[:],lat[:]) # for grids...
+            self.longitude = np.zeros(lon.shape,dtype=lon.dtype)
+            self.longitude[:] = lon[:]
+            
+            self.latitude  = np.zeros(lat.shape,dtype=lat.dtype)
+            self.latitude[:]  = lat[:]
+            
+            self.bbox = box_covering(self.longitude,self.latitude\
+                                     ,hack_branchcut_threshold=self.hack_branchcut_threshold\
+            )
+            print( 'longitude.shape: ',self.longitude.shape)
+            print( 'latitude.shape:  ',self.latitude.shape)
+
+            if len(self.longitude.shape) == 2:
+                nAlong  = self.longitude.shape[0]
+                nAcross = self.longitude.shape[1]
+            else:
+                nAlong  = len(lat)
+                nAcross = len(lon)
+            print( '0 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
+
+            data = np.zeros((nAlong,nAcross))
+            print( 'a data.shape:     '+str(data.shape))
+            print( 'd ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
+            
+            data[0:nAlong,0:nAcross] = ds[0:nAlong,0:nAcross,0].astype(np.double)
+
+            self.slice_size = nAlong*nAcross
+
+            print( '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
+            print( '2 data.shape:     '+str(data.shape))
+        
+            # attrs        = ds.attributes(full=1)
+            attrs        = ds.attrs
+            print('ds.attrs: ',ds.attrs)
+            aoa          = attrs["Offset"]
+            add_offset   = aoa[0]
+            fva          = attrs["_FillValue"]
+            _FillValue   = fva[0]
+            sfa          = attrs["ScaleFactor"]
+            scale_factor = sfa[0]
+            
+            print( 'aoa: ',aoa)
+            print( 'fva: ',fva)
+            print( 'sfa: ',sfa)
+
+            ua           = attrs[self.key_units]
+            self.units        = ua[0]
+            print( 'ua:  ',ua)
+
+            print( '0 mnmx(data): ',np.nanmin(data),np.nanmax(data))
+            invalid = None
+            if "HDFEOS/SWATHS/O3Profile/Data Fields/O3" != self.datafieldname:
+                vra          = attrs["ValidRange"]
+                valid_min    = vra[0]
+                valid_max    = vra[1]
+                print( 'vra: ',vra)
+
+                invalid = np.logical_or(data > valid_max, data < valid_min)
+                invalid = np.logical_or(invalid,data == _FillValue)
+
+            else:
+                invalid = np.where(data == _FillValue)
+                # invalid = np.logical_or(True???,data == _FillValue)
+
+            if invalid is not None:
+                data[invalid] = np.nan
+            print( '1 mnmx(data): ',np.nanmin(data),np.nanmax(data))
+
+            # Not sure about the following. Cribbed from MODIS approach.
+            data = (data - add_offset) * scale_factor
+            self.data = np.ma.masked_array(data, np.isnan(data))
+            print( '2 mnmx(self.data): ',np.nanmin(self.data),np.nanmax(self.data))
+
     def init_viz(self\
                      ,figax=None
-                     ,wh_scale=None
-                     ,lat_center=None, lon_center=None
-                     ,plot_options = None
-                     ,proj   = None
-                     ,transf = None
+                     # ,wh_scale=None
+                     # ,lat_center=None, lon_center=None
                      ):
         """
         Initialize visualization.
         """
-        self.figax  = (FigAxContainer(plt.subplots(1, subplot_kw=plot_options)) if figax is None else figax)
+
+        # if lat_center is None:
+        #         self.plot_lat_m_center = np.nanmean(self.latitude)
+        # else:
+        #         self.plot_lat_m_center = lat_center
+        # if lon_center is None:
+        #         self.plot_lon_m_center = np.nanmean(self.longitude)
+        # else:
+        #         self.plot_lon_m_center = lon_center
+
         self.plot_options = ({'projection': ccrs.PlateCarree(), 'transform': ccrs.Geodetic()} if plot_options is None else plot_options)
-
-        self.proj   = (ccrs.PlateCarree() if proj is None else proj)
-        self.transf = (ccrs.Geodetic() if transf is None else transf)
+        self.figax  = (FigAxContainer(plt.subplots(1, subplot_kw=self.plot_options)) if figax is None else figax)
         
-        if lat_center is None:
-            self.plot_lat_m_center = np.nanmean(self.latitude)
-        else:
-            self.plot_lat_m_center = lat_center
-        if lon_center is None:
-            self.plot_lon_m_center = np.nanmean(self.longitude)
-        else:
-            self.plot_lon_m_center = lon_center
-
-        if wh_scale is None:
-            self.m = Basemap(projection='cyl', resolution='l'\
-                             ,ax=ax\
-                             ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center)
-        else:
-            self.m = Basemap(projection='laea', resolution='l', lat_ts=65\
-                             ,ax=ax\
-                             ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center\
-                             ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
+        self.proj   = self.plot_options['projection']
+        self.transf = self.plot_options['transform']
+        
+        # if wh_scale is None:
+        #     self.figax.ax = 
+        #     # self.m = Basemap(projection='cyl', resolution='l'\
+        #     #                  ,ax=ax\
+        #     #                  ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center)
+        # else:
+        #     
+        #     self.m = Basemap(projection='laea', resolution='l', lat_ts=65\
+        #                      ,ax=ax\
+        #                      ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center\
+        #                      ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
 
         # self.ax.set_global()
-        self.ax.coastlines()
-        self.m.drawcoastlines(linewidth=0.5)
-        self.m.drawparallels(np.arange(-90.0, 91., 10.), labels=[1, 0, 0, 0])
-        self.m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
+        self.figax.ax.coastlines(linewidth=0.5)
+        self.figax.ax.gridlines()
+        # self.m.drawparallels(np.arange(-90.0, 91., 10.), labels=[1, 0, 0, 0])
+        # self.m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
 
     def show(self):
         plt.show()
@@ -753,7 +878,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
             vmax = np.nanmax(self.data)
         
         # m.scatter(longitude, latitude, c=data, latlon=True)
-        self.m.pcolormesh(self.longitude, self.latitude, self.data, latlon=True\
+        self.figax.ax.pcolormesh(self.longitude, self.latitude, self.data, latlon=True\
                          ,vmin=vmin,vmax=vmax)
         if colorbar:
             cb=self.m.colorbar()
@@ -862,6 +987,10 @@ custom_loader=None.  A callable(self) that allows a user to write a
     def ravel(self):
         return \
           np.ravel(self.data),np.ravel(self.latitude),np.ravel(self.longitude)
+
+    def ravel_slice(self,z):
+        return \
+          np.ravel(self.data[:,:,z]),np.ravel(self.latitude),np.ravel(self.longitude)
 
     def data_mnmx(self):
         return (np.nanmin(self.data),np.nanmax(self.data))

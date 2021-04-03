@@ -2,5 +2,6 @@
 *.pyc
 _test.py
 *~
+noggin_krige.hdf
 
 
