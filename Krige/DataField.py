@@ -402,6 +402,7 @@ class DataField(object):
     ax     = None
     proj   = None
     transf = None
+    figax  = None
     
     colormesh_title = 'colormesh_title'
     long_name = 'long_name'
@@ -900,23 +901,19 @@ custom_loader=None.  A callable(self) that allows a user to write a
         if save_m is not None:
             self.m = save_m
 
-    def scatterplot(self,m=None,vmin=np.nan,vmax=np.nan\
+    def scatterplot(self
+                    ,marker_size=1
+                    ,colorbar=False
+                    ,title=None
+                    ,m=None,vmin=np.nan,vmax=np.nan\
                     ,plt_show=True,ax=None\
-                    ,marker_size=1\
-                    ,colorbar=False\
-                    ,title=None\
                     ,cmap=None\
                     ,value_map=None\
                     ,edgecolors=None\
     ):
-        # Render the plot in a lambert equal area projection.
-        save_m = None
-        if m is None:
-            if self.m is None:
-                self.init_basemap(ax=ax)
-        else:
-            save_m = self.m
-            self.m = m
+
+        if self.figax is None:
+            self.init_viz()
 
         if(np.isnan(vmin)):
             vmin = np.nanmin(self.data)
@@ -926,13 +923,13 @@ custom_loader=None.  A callable(self) that allows a user to write a
         sc = None
         if value_map is None:
             if cmap is None:
-                sc = self.m.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
+                sc = self.figax.ax.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
                                     ,vmin=vmin,vmax=vmax\
                                     ,s=marker_size\
                                     ,edgecolors=edgecolors\
                 )
             else:
-                sc = self.m.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
+                sc = self.figax.ax.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
                                     ,vmin=vmin,vmax=vmax\
                                     ,s=marker_size\
                                     ,cmap=cmap
@@ -940,7 +937,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
                 )
         else:
             if cmap is None:
-                sc = self.m.scatter(self.longitude, self.latitude\
+                sc = self.figax.ax.scatter(self.longitude, self.latitude\
                                     ,c=value_map(self.data)\
                                     ,latlon=True\
                                     ,vmin=vmin,vmax=vmax\
@@ -948,7 +945,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
                                     ,edgecolors=edgecolors\
                 )
             else:
-                sc = self.m.scatter(self.longitude, self.latitude\
+                sc = self.figax.ax.scatter(self.longitude, self.latitude\
                                     ,c=value_map(self.data)\
                                     ,latlon=True\
                                     ,vmin=vmin,vmax=vmax\
