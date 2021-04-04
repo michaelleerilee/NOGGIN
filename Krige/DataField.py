@@ -41,6 +41,7 @@ class FigAxContainer(object):
     def __init__(self,figax):
         self.fig = figax[0]
         self.ax  = figax[1]
+        self.plot_options = {'projection': self.ax.projection, 'transform': self.ax._transform} # Careful...
         return
 
     def add_coastlines(self,set_global=None):
@@ -834,11 +835,11 @@ custom_loader=None.  A callable(self) that allows a user to write a
         # else:
         #         self.plot_lon_m_center = lon_center
 
-        self.plot_options = ({'projection': ccrs.PlateCarree(), 'transform': ccrs.Geodetic()} if plot_options is None else plot_options)
-        self.figax  = (FigAxContainer(plt.subplots(1, subplot_kw=self.plot_options)) if figax is None else figax)
-        
-        self.proj   = self.plot_options['projection']
-        self.transf = self.plot_options['transform']
+        if figax is None:
+            plot_options = {'projection': ccrs.PlateCarree(), 'transform': ccrs.Geodetic()}
+            self.figax = FigAxContainer(plt.subplots(1, subplot_kw=plot_options))
+        else:
+            self.figax = figax
         
         # if wh_scale is None:
         #     self.figax.ax = 
@@ -861,17 +862,12 @@ custom_loader=None.  A callable(self) that allows a user to write a
     def show(self):
         plt.show()
         
-    def colormesh(self,m=None,vmin=np.nan,vmax=np.nan\
-                      ,plt_show=False,ax=None\
-                      ,colorbar=False,title=None):
-        # Render the plot in a lambert equal area projection.
-        save_m = None
-        if m is None:
-            if self.m is None:
-                self.init_basemap(ax=ax)
-        else:
-            save_m = self.m
-            self.m = m
+    def colormesh(self\
+                      ,vmin=np.nan,vmax=np.nan
+                      ,plt_show=False
+                      ,colorbar=False
+                      ,title=None
+                      ):
 
         if(np.isnan(vmin)):
             vmin = np.nanmin(self.data)
@@ -879,10 +875,14 @@ custom_loader=None.  A callable(self) that allows a user to write a
             vmax = np.nanmax(self.data)
         
         # m.scatter(longitude, latitude, c=data, latlon=True)
-        self.figax.ax.pcolormesh(self.longitude, self.latitude, self.data, latlon=True\
-                         ,vmin=vmin,vmax=vmax)
+        # plt.pcolormesh?
+            pc = self.figax.ax.pcolormesh(self.longitude, self.latitude, self.data, latlon=True\
+                                ,vmin=vmin,vmax=vmax
+                                # ,transform=self.figax.ax._transform
+                                ,transform=ccrs.PlateCarree()
+                                         )
         if colorbar:
-            cb=self.m.colorbar()
+            cb = plt.colorbar(pc,ax=figax.ax)
             cb.set_label(self.units, fontsize=8)
 
         if title is not None:
@@ -898,8 +898,6 @@ custom_loader=None.  A callable(self) that allows a user to write a
         # fig.savefig(pngfile)
         if plt_show:
             plt.show()
-        if save_m is not None:
-            self.m = save_m
 
     def scatterplot(self
                     ,marker_size=1
@@ -923,43 +921,55 @@ custom_loader=None.  A callable(self) that allows a user to write a
         sc = None
         if value_map is None:
             if cmap is None:
-                sc = self.figax.ax.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
-                                    ,vmin=vmin,vmax=vmax\
-                                    ,s=marker_size\
-                                    ,edgecolors=edgecolors\
-                )
+                sc = self.figax.ax.scatter(
+                    x=self.longitude
+                    ,y=self.latitude
+                    ,c=self.data
+                    ,transform=ccrs.PlateCarree() ### Just why?
+                    ,vmin=vmin,vmax=vmax\
+                    ,s=marker_size\
+                    ,edgecolors=edgecolors\
+                    )
             else:
-                sc = self.figax.ax.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
-                                    ,vmin=vmin,vmax=vmax\
-                                    ,s=marker_size\
-                                    ,cmap=cmap
-                                    ,edgecolors=edgecolors\
-                )
+                sc = self.figax.ax.scatter(
+                    x=self.longitude
+                    ,y=self.latitude
+                    ,c=self.data
+                    ,transform=ccrs.PlateCarree() ### Just why?
+                    ,vmin=vmin,vmax=vmax\
+                    ,s=marker_size\
+                    ,cmap=cmap
+                    ,edgecolors=edgecolors\
+                    )
         else:
             if cmap is None:
-                sc = self.figax.ax.scatter(self.longitude, self.latitude\
-                                    ,c=value_map(self.data)\
-                                    ,latlon=True\
-                                    ,vmin=vmin,vmax=vmax\
-                                    ,s=marker_size\
-                                    ,edgecolors=edgecolors\
-                )
+                sc = self.figax.ax.scatter(
+                    x=self.longitude
+                    ,y=self.latitude\
+                    ,c=value_map(self.data)\
+                    ,transform=ccrs.PlateCarree() ### Just why?
+                    ,vmin=vmin,vmax=vmax\
+                    ,s=marker_size\
+                    ,edgecolors=edgecolors\
+                    )
             else:
-                sc = self.figax.ax.scatter(self.longitude, self.latitude\
-                                    ,c=value_map(self.data)\
-                                    ,latlon=True\
-                                    ,vmin=vmin,vmax=vmax\
-                                    ,s=marker_size\
-                                    ,cmap=cmap
-                                    ,edgecolors=edgecolors\
-                )
+                sc = self.figax.ax.scatter(
+                    x=self.longitude
+                    ,y=self.latitude\
+                    ,c=value_map(self.data)\
+                    ,transform=ccrs.PlateCarree() ### Just why?
+                    ,vmin=vmin,vmax=vmax\
+                    ,s=marker_size\
+                    ,cmap=cmap
+                    ,edgecolors=edgecolors\
+                    )
             
         # self.m.pcolormesh(self.longitude, self.latitude, self.data, latlon=True\
         #                 ,vmin=vmin,vmax=vmax)
         if colorbar:
             # fig=plt.gcf()
             # cb = fig.colorbar(sc,ax=ax)
-            cb = self.m.colorbar(sc)
+            cb = plt.colorbar(sc,ax=self.figax.ax)
             cb.set_label(self.units, fontsize=8)
 
         if title is not None:
@@ -975,11 +985,9 @@ custom_loader=None.  A callable(self) that allows a user to write a
         # fig.savefig(pngfile)
         if plt_show:
             plt.show()
-        if save_m is not None:
-            self.m = save_m
 
-    def get_m(self):
-        return self.m
+    def get_figax(self):
+        return self.figax
         
     def ravel(self):
         return \
