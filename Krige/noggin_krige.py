@@ -528,6 +528,14 @@ for krigeBox in targetBoxes:
     #     break
 
 ###########################################################################
+
+# Trying to save the (swath) data for later viewing doesn't work yet.
+# concatenate_data=True
+concatenate_data=False
+if concatenate_data:
+    lon_save = None
+    lat_save = None
+    dat_save = None
     
     
 ### TODO: Verify the size of tgt_?1d match the calculated result.
@@ -769,7 +777,21 @@ for krigeBox in targetBoxes:
             npts_increase_flag = True
             npts_last_kr_s     = 0
 
-            #### 
+            ####
+            if concatenate_data:
+                if lon_save is None:
+                    lon_save = longitude1.copy()
+                    lat_save = latitude1.copy()
+                    dat_save = data1.copy()
+                else:
+                    print('lon_s shape: ',lon_save.shape)
+                    print('lon_s type:  ',type(lon_save))
+                    print('lon_s dtype: ',lon_save.dtype)
+                    print('lon_1 shape: ',longitude1.shape)                    
+                    lon_save = np.concatenate((lon_save,longitude1))
+                    lat_save = np.concatenate((lat_save,latitude1))
+                    dat_save = np.concatenate((dat_save,data1))
+            ####
             
             while( True ):
                 if _verbose:
@@ -944,21 +966,43 @@ if True:
             print('noggin_krige: as json: '+krigeSketch_results[-1].config.as_json())
     
     if not args.gap_fill:
-        # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
-        kHDF = Krige.krigeHDF(\
-                              krg_name                 = variable_name+'_krg'\
-                              ,krg_units               = modis_obj.units\
-                              ,config                  = krigeSketch_results[-1].config\
-                              ,krg_z                   = z\
-                              ,krg_s                   = s\
-                              ,krg_x                   = tgt_X1d\
-                              ,krg_y                   = tgt_Y1d\
-                              ,orig_name               = modis_obj.datafieldname\
-                              ,orig_units              = modis_obj.units\
-                              ,output_filename         = output_filename\
-                              ,redimension             = False\
-                              ,type_hint               = 'grid'\
-        )
+        if concatenate_data:
+            # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
+            kHDF = Krige.krigeHDF(\
+                                krg_name                 = variable_name+'_krg'\
+                                ,krg_units               = modis_obj.units\
+                                ,config                  = krigeSketch_results[-1].config\
+                                ,krg_z                   = z\
+                                ,krg_s                   = s\
+                                ,krg_x                   = tgt_X1d\
+                                ,krg_y                   = tgt_Y1d\
+                                ,src_x                   = lon_save\
+                                ,src_y                   = lat_save\
+                                ,src_z                   = dat_save\
+                                ,src_name                = modis_obj.datafieldname\
+                                ,src_units               = modis_obj.units\
+                                ,orig_name               = modis_obj.datafieldname\
+                                ,orig_units              = modis_obj.units\
+                                ,output_filename         = output_filename\
+                                ,redimension             = False\
+                                ,type_hint               = 'swath'\
+            )
+        else:
+            # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
+            kHDF = Krige.krigeHDF(\
+                                krg_name                 = variable_name+'_krg'\
+                                ,krg_units               = modis_obj.units\
+                                ,config                  = krigeSketch_results[-1].config\
+                                ,krg_z                   = z\
+                                ,krg_s                   = s\
+                                ,krg_x                   = tgt_X1d\
+                                ,krg_y                   = tgt_Y1d\
+                                ,orig_name               = modis_obj.datafieldname\
+                                ,orig_units              = modis_obj.units\
+                                ,output_filename         = output_filename\
+                                ,redimension             = False\
+                                ,type_hint               = 'grid'\
+                                )
     else:
         # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
         #
