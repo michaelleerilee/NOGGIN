@@ -764,12 +764,21 @@ custom_loader=None.  A callable(self) that allows a user to write a
                 nAcross = len(lon)
             print( '0 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
 
-            data = np.zeros((nAlong,nAcross))
-            print( 'a data.shape:     '+str(data.shape))
-            print( 'd ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
-            
-            data[0:nAlong,0:nAcross] = ds[0:nAlong,0:nAcross,0].astype(np.double)
+            print( 'd1 ds.data.shape:  '+str(ds[:].astype(np.double).shape))
+            print( 'd2 ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
+            print( 'd3 ds.data.shape:  '+str(ds[:,:,:].astype(np.double).shape))
 
+            if len(ds.shape) == 2:
+                nZ = 1
+                data = np.zeros((nAlong,nAcross))
+                data[0:nAlong,0:nAcross] = ds[0:nAlong,0:nAcross].astype(np.double)
+            else: # TODO Assume 3 for now fix later.
+                nZ = ds.shape[2]
+                data = np.zeros((nAlong,nAcross,nZ))
+                data[0:nAlong,0:nAcross,0:nZ] = ds[0:nAlong,0:nAcross,:].astype(np.double)
+
+            print( 'a data.shape:     '+str(data.shape))
+            print(' a nZ:             '+str(nZ))
             self.slice_size = nAlong*nAcross
 
             print( '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))

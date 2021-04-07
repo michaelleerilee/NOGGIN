@@ -629,16 +629,23 @@ for krigeBox in targetBoxes:
             data      = np.zeros(total_size_modis_objs)
             latitude  = np.zeros(total_size_modis_objs)
             longitude = np.zeros(total_size_modis_objs)
+
+            print("len(modis_objs[i].data.shape)",len(modis_objs[0].data.shape))
+            # exit()
  
-            islice = 0
+            # TODO Set islice via CL parameter
+            # islice = 0
+            islice = 9
             i0=0
             for i in range(len(sizes_modis_objs)):
                 i1 = i0 + sizes_modis_objs[i]
                 if _verbose:
                     print('adding indexes: ', i0, i1)
                 if len(modis_objs[i].data.shape) == 3:
+                    print('extracting data slice: ',islice)
                     data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel_slice(islice)
                 else:
+                    print('exctracting data')
                     data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel()
                 i0=i1
 
