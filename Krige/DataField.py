@@ -23,14 +23,33 @@ import os
 import numpy as np
 from pyhdf.SD import SD, SDC
 import h5py as h5
+from netCDF4 import Dataset
 
 import matplotlib as mpl
 # mpl.use('Agg')
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
+# import matplotlib.tri as tri
+
+import cartopy.crs as ccrs
+# from mpl_toolkits.basemap import Basemap
+
 from Krige import fig_generator, data_src_directory
 
 import unittest
+
+class FigAxContainer(object):
+    def __init__(self,figax):
+        self.fig = figax[0]
+        self.ax  = figax[1]
+        self.plot_options = {'projection': self.ax.projection, 'transform': self.ax._transform} # Careful...
+        return
+
+    def add_coastlines(self,set_global=None):
+        set_global = (False if set_global is None else set_global)
+        if set_global:
+            self.ax.set_global()
+        self.ax.add_feature(cf.COASTLINE,linewidth=0.5, edgecolor='k')
+        return self
 
 class Interval(object):
     def __init__(self):
@@ -377,7 +396,15 @@ class DataField(object):
     units      ='units'
     nAlong  = 0
     nAcross = 0
-    m = None
+
+    slice_size = 0
+
+    # fig = None
+    ax     = None
+    proj   = None
+    transf = None
+    figax  = None
+    
     colormesh_title = 'colormesh_title'
     long_name = 'long_name'
 
@@ -435,7 +462,15 @@ custom_loader=None.  A callable(self) that allows a user to write a
                 return
         elif self.datafilename[0:3] in ["OMI"]:
             # How did OMI get in a MODIS object?
-            self.loadOMI_L3()
+            if "L3" in self.datafilename:
+                self.loadOMI_L3()
+            elif "L2" in self.datafilename:
+                self.loadOMI_L2()
+            else:
+                print( 'failed loading '+self.datafilename)
+                print( 'loading type '+self.datafilename[0:5]+' not supported. returning...')
+                return
+                
         else:
             print( 'failed loading '+self.datafilename)
             print( 'loading type '+self.datafilename[0:3]+' not supported. returning...')
@@ -471,6 +506,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
 
         data = np.zeros((nAlong,nAcross))
         data = ds[0:nAlong,0:nAcross].astype(np.double)
+        self.slice_size = nAlong*nAcross
         
         attrs        = ds.attributes(full=1)
         lna          = attrs["long_name"]
@@ -531,6 +567,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
         print( 'd ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
         
         data = ds[0:nAlong,0:nAcross].astype(np.double)
+        self.slice_size=nAlong*nAcross
 
         print( '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
         print( '2 data.shape:     '+str(data.shape))
@@ -631,6 +668,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
             print( 'd ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
             
             data = ds[0:nAlong,0:nAcross].astype(np.double)
+            self.slice_size = nAlong*nAcross
 
             print( '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
             print( '2 data.shape:     '+str(data.shape))
@@ -668,49 +706,177 @@ custom_loader=None.  A callable(self) that allows a user to write a
             self.data = np.ma.masked_array(data, np.isnan(data))
             print( '2 mnmx(self.data): ',np.nanmin(self.data),np.nanmax(self.data))
 
-    def init_basemap(self,ax=None,wh_scale=None\
-                         ,lat_center=None, lon_center=None
-                         ):
-        """
-        Initialize basemap visualization.
-        """
-        if lat_center is None:
-            self.plot_lat_m_center = np.nanmean(self.latitude)
-        else:
-            self.plot_lat_m_center = lat_center
-        if lon_center is None:
-            self.plot_lon_m_center = np.nanmean(self.longitude)
-        else:
-            self.plot_lon_m_center = lon_center
+    def loadOMI_L2(self):
 
-        if wh_scale is None:
-            self.m = Basemap(projection='cyl', resolution='l'\
-                             ,ax=ax\
-                             ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center)
-        else:
-            self.m = Basemap(projection='laea', resolution='l', lat_ts=65\
-                             ,ax=ax\
-                             ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center\
-                             ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
+        # e.g. http://hdfeos.org/software/h5py.php
+        # TODO: Consider netCDF4 vs. h5py
+        print( 'loadOMI_L2')
         
-        self.m.drawcoastlines(linewidth=0.5)
-        self.m.drawparallels(np.arange(-90.0, 91., 10.), labels=[1, 0, 0, 0])
-        self.m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
+        with h5.File(self.srcdirname+self.datafilename, mode='r') as hdf:
+
+            if self.geofile != "":
+                raise NotImplementedError('separate geofile with location information not implemented!')
+
+            print('ds: ',hdf['HDFEOS/SWATHS'].keys())
+            print('  : ',hdf['HDFEOS/SWATHS/O3Profile/'].keys())
+            
+            ds  = hdf[self.datafieldname]
+
+            # print 'hdf.keys: ',hdf.keys()
+            print( 'ds.attrs.keys: ',ds.attrs.keys())
+
+            # long_name="Atmospheric_Water_Vapor_Mean"
+            ### TODO Maybe these do not need to be fields, just local vars
+                        
+            # :NumberOfLongitudesInGrid
+
+            self.key_along  = ''
+            self.key_across = ''
+            self.colormesh_title = self.datafilename
+            self.key_units = 'Units'
+
+            lat = hdf['HDFEOS/SWATHS/O3Profile/Geolocation Fields/Latitude']
+            lon = hdf['HDFEOS/SWATHS/O3Profile/Geolocation Fields/Longitude']
+
+            print( 'type(lon): '+str(type(lon)))
+            print( 'type(lat): '+str(type(lat)))
+            print( 'lon.shape: '+str(lon[:].shape))
+            print( 'lat.shape: '+str(lat[:].shape))
+            
+            # self.longitude,self.latitude = np.meshgrid(lon[:],lat[:]) # for grids...
+            self.longitude = np.zeros(lon.shape,dtype=lon.dtype)
+            self.longitude[:] = lon[:]
+            
+            self.latitude  = np.zeros(lat.shape,dtype=lat.dtype)
+            self.latitude[:]  = lat[:]
+            
+            self.bbox = box_covering(self.longitude,self.latitude\
+                                     ,hack_branchcut_threshold=self.hack_branchcut_threshold\
+            )
+            print( 'longitude.shape: ',self.longitude.shape)
+            print( 'latitude.shape:  ',self.latitude.shape)
+
+            if len(self.longitude.shape) == 2:
+                nAlong  = self.longitude.shape[0]
+                nAcross = self.longitude.shape[1]
+            else:
+                nAlong  = len(lat)
+                nAcross = len(lon)
+            print( '0 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
+
+            print( 'd1 ds.data.shape:  '+str(ds[:].astype(np.double).shape))
+            print( 'd2 ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
+            print( 'd3 ds.data.shape:  '+str(ds[:,:,:].astype(np.double).shape))
+
+            if len(ds.shape) == 2:
+                nZ = 1
+                data = np.zeros((nAlong,nAcross))
+                data[0:nAlong,0:nAcross] = ds[0:nAlong,0:nAcross].astype(np.double)
+            else: # TODO Assume 3 for now fix later.
+                nZ = ds.shape[2]
+                data = np.zeros((nAlong,nAcross,nZ))
+                data[0:nAlong,0:nAcross,0:nZ] = ds[0:nAlong,0:nAcross,:].astype(np.double)
+
+            print( 'a data.shape:     '+str(data.shape))
+            print(' a nZ:             '+str(nZ))
+            self.slice_size = nAlong*nAcross
+
+            print( '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
+            print( '2 data.shape:     '+str(data.shape))
+        
+            # attrs        = ds.attributes(full=1)
+            attrs        = ds.attrs
+            print('ds.attrs: ',ds.attrs)
+            aoa          = attrs["Offset"]
+            add_offset   = aoa[0]
+            fva          = attrs["_FillValue"]
+            _FillValue   = fva[0]
+            sfa          = attrs["ScaleFactor"]
+            scale_factor = sfa[0]
+            
+            print( 'aoa: ',aoa)
+            print( 'fva: ',fva)
+            print( 'sfa: ',sfa)
+
+            ua           = attrs[self.key_units]
+            self.units        = ua[0]
+            print( 'ua:  ',ua)
+
+            print( '0 mnmx(data): ',np.nanmin(data),np.nanmax(data))
+            invalid = None
+            if "HDFEOS/SWATHS/O3Profile/Data Fields/O3" != self.datafieldname:
+                vra          = attrs["ValidRange"]
+                valid_min    = vra[0]
+                valid_max    = vra[1]
+                print( 'vra: ',vra)
+
+                invalid = np.logical_or(data > valid_max, data < valid_min)
+                invalid = np.logical_or(invalid,data == _FillValue)
+
+            else:
+                invalid = np.where(data == _FillValue)
+                # invalid = np.logical_or(True???,data == _FillValue)
+
+            if invalid is not None:
+                data[invalid] = np.nan
+            print( '1 mnmx(data): ',np.nanmin(data),np.nanmax(data))
+
+            # Not sure about the following. Cribbed from MODIS approach.
+            data = (data - add_offset) * scale_factor
+            self.data = np.ma.masked_array(data, np.isnan(data))
+            print( '2 mnmx(self.data): ',np.nanmin(self.data),np.nanmax(self.data))
+
+    def init_viz(self\
+                     ,figax=None
+                     # ,wh_scale=None
+                     # ,lat_center=None, lon_center=None
+                     ):
+        """
+        Initialize visualization.
+        """
+
+        # if lat_center is None:
+        #         self.plot_lat_m_center = np.nanmean(self.latitude)
+        # else:
+        #         self.plot_lat_m_center = lat_center
+        # if lon_center is None:
+        #         self.plot_lon_m_center = np.nanmean(self.longitude)
+        # else:
+        #         self.plot_lon_m_center = lon_center
+
+        if figax is None:
+            plot_options = {'projection': ccrs.PlateCarree(), 'transform': ccrs.Geodetic()}
+            self.figax = FigAxContainer(plt.subplots(1, subplot_kw=plot_options))
+        else:
+            self.figax = figax
+        
+        # if wh_scale is None:
+        #     self.figax.ax = 
+        #     # self.m = Basemap(projection='cyl', resolution='l'\
+        #     #                  ,ax=ax\
+        #     #                  ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center)
+        # else:
+        #     
+        #     self.m = Basemap(projection='laea', resolution='l', lat_ts=65\
+        #                      ,ax=ax\
+        #                      ,lat_0=self.plot_lat_m_center, lon_0=self.plot_lon_m_center\
+        #                      ,width=wh_scale[0]*3000000,height=wh_scale[1]*2500000)
+
+        # self.ax.set_global()
+        self.figax.ax.coastlines(linewidth=0.5)
+        self.figax.ax.gridlines()
+        # self.m.drawparallels(np.arange(-90.0, 91., 10.), labels=[1, 0, 0, 0])
+        # self.m.drawmeridians(np.arange(-180, 181., 30), labels=[0, 0, 0, 1])
 
     def show(self):
         plt.show()
         
-    def colormesh(self,m=None,vmin=np.nan,vmax=np.nan\
-                      ,plt_show=False,ax=None\
-                      ,colorbar=False,title=None):
-        # Render the plot in a lambert equal area projection.
-        save_m = None
-        if m is None:
-            if self.m is None:
-                self.init_basemap(ax=ax)
-        else:
-            save_m = self.m
-            self.m = m
+    def colormesh(self\
+                      ,vmin=np.nan,vmax=np.nan
+                      ,plt_show=False
+                      ,colorbar=False
+                      ,title=None
+                      ):
 
         if(np.isnan(vmin)):
             vmin = np.nanmin(self.data)
@@ -718,10 +884,14 @@ custom_loader=None.  A callable(self) that allows a user to write a
             vmax = np.nanmax(self.data)
         
         # m.scatter(longitude, latitude, c=data, latlon=True)
-        self.m.pcolormesh(self.longitude, self.latitude, self.data, latlon=True\
-                         ,vmin=vmin,vmax=vmax)
+        # plt.pcolormesh?
+            pc = self.figax.ax.pcolormesh(self.longitude, self.latitude, self.data, latlon=True\
+                                ,vmin=vmin,vmax=vmax
+                                # ,transform=self.figax.ax._transform
+                                ,transform=ccrs.PlateCarree()
+                                         )
         if colorbar:
-            cb=self.m.colorbar()
+            cb = plt.colorbar(pc,ax=figax.ax)
             cb.set_label(self.units, fontsize=8)
 
         if title is not None:
@@ -737,26 +907,20 @@ custom_loader=None.  A callable(self) that allows a user to write a
         # fig.savefig(pngfile)
         if plt_show:
             plt.show()
-        if save_m is not None:
-            self.m = save_m
 
-    def scatterplot(self,m=None,vmin=np.nan,vmax=np.nan\
+    def scatterplot(self
+                    ,marker_size=1
+                    ,colorbar=False
+                    ,title=None
+                    ,m=None,vmin=np.nan,vmax=np.nan\
                     ,plt_show=True,ax=None\
-                    ,marker_size=1\
-                    ,colorbar=False\
-                    ,title=None\
                     ,cmap=None\
                     ,value_map=None\
                     ,edgecolors=None\
     ):
-        # Render the plot in a lambert equal area projection.
-        save_m = None
-        if m is None:
-            if self.m is None:
-                self.init_basemap(ax=ax)
-        else:
-            save_m = self.m
-            self.m = m
+
+        if self.figax is None:
+            self.init_viz()
 
         if(np.isnan(vmin)):
             vmin = np.nanmin(self.data)
@@ -766,43 +930,55 @@ custom_loader=None.  A callable(self) that allows a user to write a
         sc = None
         if value_map is None:
             if cmap is None:
-                sc = self.m.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
-                                    ,vmin=vmin,vmax=vmax\
-                                    ,s=marker_size\
-                                    ,edgecolors=edgecolors\
-                )
+                sc = self.figax.ax.scatter(
+                    x=self.longitude
+                    ,y=self.latitude
+                    ,c=self.data
+                    ,transform=ccrs.PlateCarree() ### Just why?
+                    ,vmin=vmin,vmax=vmax\
+                    ,s=marker_size\
+                    ,edgecolors=edgecolors\
+                    )
             else:
-                sc = self.m.scatter(self.longitude, self.latitude, c=self.data, latlon=True\
-                                    ,vmin=vmin,vmax=vmax\
-                                    ,s=marker_size\
-                                    ,cmap=cmap
-                                    ,edgecolors=edgecolors\
-                )
+                sc = self.figax.ax.scatter(
+                    x=self.longitude
+                    ,y=self.latitude
+                    ,c=self.data
+                    ,transform=ccrs.PlateCarree() ### Just why?
+                    ,vmin=vmin,vmax=vmax\
+                    ,s=marker_size\
+                    ,cmap=cmap
+                    ,edgecolors=edgecolors\
+                    )
         else:
             if cmap is None:
-                sc = self.m.scatter(self.longitude, self.latitude\
-                                    ,c=value_map(self.data)\
-                                    ,latlon=True\
-                                    ,vmin=vmin,vmax=vmax\
-                                    ,s=marker_size\
-                                    ,edgecolors=edgecolors\
-                )
+                sc = self.figax.ax.scatter(
+                    x=self.longitude
+                    ,y=self.latitude\
+                    ,c=value_map(self.data)\
+                    ,transform=ccrs.PlateCarree() ### Just why?
+                    ,vmin=vmin,vmax=vmax\
+                    ,s=marker_size\
+                    ,edgecolors=edgecolors\
+                    )
             else:
-                sc = self.m.scatter(self.longitude, self.latitude\
-                                    ,c=value_map(self.data)\
-                                    ,latlon=True\
-                                    ,vmin=vmin,vmax=vmax\
-                                    ,s=marker_size\
-                                    ,cmap=cmap
-                                    ,edgecolors=edgecolors\
-                )
+                sc = self.figax.ax.scatter(
+                    x=self.longitude
+                    ,y=self.latitude\
+                    ,c=value_map(self.data)\
+                    ,transform=ccrs.PlateCarree() ### Just why?
+                    ,vmin=vmin,vmax=vmax\
+                    ,s=marker_size\
+                    ,cmap=cmap
+                    ,edgecolors=edgecolors\
+                    )
             
         # self.m.pcolormesh(self.longitude, self.latitude, self.data, latlon=True\
         #                 ,vmin=vmin,vmax=vmax)
         if colorbar:
             # fig=plt.gcf()
             # cb = fig.colorbar(sc,ax=ax)
-            cb = self.m.colorbar(sc)
+            cb = plt.colorbar(sc,ax=self.figax.ax)
             cb.set_label(self.units, fontsize=8)
 
         if title is not None:
@@ -818,15 +994,17 @@ custom_loader=None.  A callable(self) that allows a user to write a
         # fig.savefig(pngfile)
         if plt_show:
             plt.show()
-        if save_m is not None:
-            self.m = save_m
 
-    def get_m(self):
-        return self.m
+    def get_figax(self):
+        return self.figax
         
     def ravel(self):
         return \
           np.ravel(self.data),np.ravel(self.latitude),np.ravel(self.longitude)
+
+    def ravel_slice(self,z):
+        return \
+          np.ravel(self.data[:,:,z]),np.ravel(self.latitude),np.ravel(self.longitude)
 
     def data_mnmx(self):
         return (np.nanmin(self.data),np.nanmax(self.data))

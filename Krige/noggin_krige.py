@@ -57,7 +57,7 @@ from scipy.spatial import ConvexHull
 import matplotlib as mpl
 # mpl.use('Agg')
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
+# from mpl_toolkits.basemap import Basemap
 from Krige import fig_generator
 
 import pykrige.variogram_models as vm
@@ -244,9 +244,16 @@ else:
 ###########################################################################
 # Start with MetaData sketch.
 # Construct bounding box index.
-src_file_list = [f for f in os.listdir(SRC_DIRECTORY) if (lambda x: '.hdf' in x or '.HDF.' in x)(f)]
+src_file_list = [f for f in os.listdir(SRC_DIRECTORY)
+                     if (lambda x:
+                             '.hdf' in x
+                             or '.HDF.' in x
+                             or '.he5' in x
+                             or '.h5' in x
+                             or '.nc' in x
+                             )(f)]
 if len(src_file_list) == 0:
-    print('noggin_krige: eror: no HDF files found in '+SRC_DIRECTORY+', exiting')
+    print('noggin_krige: error: no HDF files found in '+SRC_DIRECTORY+', exiting')
     sys.exit(1)
 modis_BoundingBoxes = {}
 if _save_index:
@@ -521,6 +528,14 @@ for krigeBox in targetBoxes:
     #     break
 
 ###########################################################################
+
+# Trying to save the (swath) data for later viewing doesn't work yet.
+# concatenate_data=True
+concatenate_data=False
+if concatenate_data:
+    lon_save = None
+    lat_save = None
+    dat_save = None
     
     
 ### TODO: Verify the size of tgt_?1d match the calculated result.
@@ -600,8 +615,9 @@ for krigeBox in targetBoxes:
                                         modis_objs.append(modis_obj)
     
             #
-            # Get the sizes, allocate the arrays, and then fill them
-            sizes_modis_objs      = [ m.data.size for m in modis_objs ]
+            # Get the (slice) sizes, allocate the arrays, and then fill them
+            # sizes_modis_objs      = [ m.data.size for m in modis_objs ]
+            sizes_modis_objs      = [ m.slice_size for m in modis_objs ]
             total_size_modis_objs = sum(sizes_modis_objs)
 
             if _sampling_fraction is not None:
@@ -613,13 +629,24 @@ for krigeBox in targetBoxes:
             data      = np.zeros(total_size_modis_objs)
             latitude  = np.zeros(total_size_modis_objs)
             longitude = np.zeros(total_size_modis_objs)
+
+            print("len(modis_objs[i].data.shape)",len(modis_objs[0].data.shape))
+            # exit()
  
+            # TODO Set islice via CL parameter
+            # islice = 0
+            islice = 9
             i0=0
             for i in range(len(sizes_modis_objs)):
                 i1 = i0 + sizes_modis_objs[i]
                 if _verbose:
                     print('adding indexes: ', i0, i1)
-                data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel()
+                if len(modis_objs[i].data.shape) == 3:
+                    print('extracting data slice: ',islice)
+                    data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel_slice(islice)
+                else:
+                    print('exctracting data')
+                    data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel()
                 i0=i1
 
             # # The data have been loaded. You can search for duplicates now.
@@ -757,7 +784,21 @@ for krigeBox in targetBoxes:
             npts_increase_flag = True
             npts_last_kr_s     = 0
 
-            #### 
+            ####
+            if concatenate_data:
+                if lon_save is None:
+                    lon_save = longitude1.copy()
+                    lat_save = latitude1.copy()
+                    dat_save = data1.copy()
+                else:
+                    print('lon_s shape: ',lon_save.shape)
+                    print('lon_s type:  ',type(lon_save))
+                    print('lon_s dtype: ',lon_save.dtype)
+                    print('lon_1 shape: ',longitude1.shape)                    
+                    lon_save = np.concatenate((lon_save,longitude1))
+                    lat_save = np.concatenate((lat_save,latitude1))
+                    dat_save = np.concatenate((dat_save,data1))
+            ####
             
             while( True ):
                 if _verbose:
@@ -932,21 +973,43 @@ if True:
             print('noggin_krige: as json: '+krigeSketch_results[-1].config.as_json())
     
     if not args.gap_fill:
-        # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
-        kHDF = Krige.krigeHDF(\
-                              krg_name                 = variable_name+'_krg'\
-                              ,krg_units               = modis_obj.units\
-                              ,config                  = krigeSketch_results[-1].config\
-                              ,krg_z                   = z\
-                              ,krg_s                   = s\
-                              ,krg_x                   = tgt_X1d\
-                              ,krg_y                   = tgt_Y1d\
-                              ,orig_name               = modis_obj.datafieldname\
-                              ,orig_units              = modis_obj.units\
-                              ,output_filename         = output_filename\
-                              ,redimension             = False\
-                              ,type_hint               = 'grid'\
-        )
+        if concatenate_data:
+            # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
+            kHDF = Krige.krigeHDF(\
+                                krg_name                 = variable_name+'_krg'\
+                                ,krg_units               = modis_obj.units\
+                                ,config                  = krigeSketch_results[-1].config\
+                                ,krg_z                   = z\
+                                ,krg_s                   = s\
+                                ,krg_x                   = tgt_X1d\
+                                ,krg_y                   = tgt_Y1d\
+                                ,src_x                   = lon_save\
+                                ,src_y                   = lat_save\
+                                ,src_z                   = dat_save\
+                                ,src_name                = modis_obj.datafieldname\
+                                ,src_units               = modis_obj.units\
+                                ,orig_name               = modis_obj.datafieldname\
+                                ,orig_units              = modis_obj.units\
+                                ,output_filename         = output_filename\
+                                ,redimension             = False\
+                                ,type_hint               = 'swath'\
+            )
+        else:
+            # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
+            kHDF = Krige.krigeHDF(\
+                                krg_name                 = variable_name+'_krg'\
+                                ,krg_units               = modis_obj.units\
+                                ,config                  = krigeSketch_results[-1].config\
+                                ,krg_z                   = z\
+                                ,krg_s                   = s\
+                                ,krg_x                   = tgt_X1d\
+                                ,krg_y                   = tgt_Y1d\
+                                ,orig_name               = modis_obj.datafieldname\
+                                ,orig_units              = modis_obj.units\
+                                ,output_filename         = output_filename\
+                                ,redimension             = False\
+                                ,type_hint               = 'grid'\
+                                )
     else:
         # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
         #
