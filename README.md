@@ -9,7 +9,7 @@ NOGGIN/Krige was developed to explore Kriging as a means to
 interpolate low-level NASA remote sensing observations to arbitrary
 points or grids.
 
-Examples of ussage are available in the comments of
+Examples of usage are available in the comments of
 Krige/noggin_krige.py.
 
 An example of how to run the code is provided in *run.sh*.
@@ -17,10 +17,12 @@ An example of how to run the code is provided in *run.sh*.
 
 ## Notable Dependencies
 
-NOGGIN/Krige depends on the *master_noggin* branch of the
+NOGGIN/Krige depends on the idiosyncratic *master_noggin* branch of the
 [fork](https://github.com/michaelleerilee/PyKrige) of
 [PyKrige](https://github.com/GeoStat-Framework/PyKrige).
 
+## Contact Information
 
+Bug reports and other comments can be [raised as issues](https://github.com/michaelleerilee/NOGGIN/issues).
 
-
+Michael Lee Rilee, Rilee Systems Technologies. mike@rilee.net
