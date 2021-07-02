@@ -446,19 +446,29 @@ custom_loader=None.  A callable(self) that allows a user to write a
             self.plot_lat_m_center = np.nanmean(self.latitude)
             self.plot_lon_m_center = np.nanmean(self.longitude)
 
+    def failed_to_load_message(self,message=None):
+        message = "returning..." if message is None else message
+        print( 'failed loading '+self.datafilename)
+        print( 'loading type '+self.datafilename[0:5]+' not supported. '+message)
+        return
+
     def load(self):
         # TODO MLR Verify this use of callable works.
         if callable(self.custom_loader):
             custom_loader(self)
             return
+        if self.datafilename[0:3] in ["VNP"]:
+            if self.datafilename[3:5] == '02':
+                self.load_VNP02()
+            else:
+                failed_to_load_message()
         if self.datafilename[0:3] in ["MOD","MYD"]:
             if self.datafilename[3:5] == '05':
                 self.load05()
             elif self.datafilename[3:5] == '08':
                 self.load08()
             else:
-                print( 'failed loading '+self.datafilename)
-                print( 'loading type '+self.datafilename[0:5]+' not supported. returning...')
+                failed_to_load_message()
                 return
         elif self.datafilename[0:3] in ["OMI"]:
             # How did OMI get in a MODIS object?
@@ -467,14 +477,10 @@ custom_loader=None.  A callable(self) that allows a user to write a
             elif "L2" in self.datafilename:
                 self.loadOMI_L2()
             else:
-                print( 'failed loading '+self.datafilename)
-                print( 'loading type '+self.datafilename[0:5]+' not supported. returning...')
+                failed_to_load_message()
                 return
-                
         else:
-            print( 'failed loading '+self.datafilename)
-            print( 'loading type '+self.datafilename[0:3]+' not supported. returning...')
-
+            failed_to_load_message()
 
     def load05(self):
         hdf = SD(self.srcdirname+self.datafilename, SDC.READ)
@@ -825,6 +831,143 @@ custom_loader=None.  A callable(self) that allows a user to write a
             data = (data - add_offset) * scale_factor
             self.data = np.ma.masked_array(data, np.isnan(data))
             print( '2 mnmx(self.data): ',np.nanmin(self.data),np.nanmax(self.data))
+
+
+    def load_VNP02(self):
+
+        # NetCDF4. Load VIIRS Data
+        # TODO: Consider netCDF4 vs. h5py
+        print( 'load_VNP02')
+        print( 'loading: ',self.srcdirname+self.datafilename)
+        print( 'loading: ',self.srcdirname+self.geofile)
+
+        # print('not implemented')
+        # exit()
+
+        if True:
+            ds = Dataset(self.srcdirname+self.datafilename)
+
+            if self.geofile == "":
+                raise NotImplementedError('separate VNP03 geofile with location information required!')
+            else:
+                ds_geo = Dataset(self.srcdirname+self.geofile)
+
+            print('ds:     ',ds.variables)
+            print('ds_geo: ',ds_geo.variables)
+
+            lats = ds_geo['geolocation_data/latitude']
+            lons = ds_geo['geolocation_data/longitude']
+            data = ds['observation_data/I04']
+
+
+            exit()
+            
+            ds  = hdf[self.datafieldname]
+
+            # print 'hdf.keys: ',hdf.keys()
+            print( 'ds.attrs.keys: ',ds.attrs.keys())
+
+            # long_name="Atmospheric_Water_Vapor_Mean"
+            ### TODO Maybe these do not need to be fields, just local vars
+                        
+            # :NumberOfLongitudesInGrid
+
+            self.key_along  = ''
+            self.key_across = ''
+            self.colormesh_title = self.datafilename
+            self.key_units = 'Units'
+
+            lat = hdf['HDFEOS/SWATHS/O3Profile/Geolocation Fields/Latitude']
+            lon = hdf['HDFEOS/SWATHS/O3Profile/Geolocation Fields/Longitude']
+
+            print( 'type(lon): '+str(type(lon)))
+            print( 'type(lat): '+str(type(lat)))
+            print( 'lon.shape: '+str(lon[:].shape))
+            print( 'lat.shape: '+str(lat[:].shape))
+            
+            # self.longitude,self.latitude = np.meshgrid(lon[:],lat[:]) # for grids...
+            self.longitude = np.zeros(lon.shape,dtype=lon.dtype)
+            self.longitude[:] = lon[:]
+            
+            self.latitude  = np.zeros(lat.shape,dtype=lat.dtype)
+            self.latitude[:]  = lat[:]
+            
+            self.bbox = box_covering(self.longitude,self.latitude\
+                                     ,hack_branchcut_threshold=self.hack_branchcut_threshold\
+            )
+            print( 'longitude.shape: ',self.longitude.shape)
+            print( 'latitude.shape:  ',self.latitude.shape)
+
+            if len(self.longitude.shape) == 2:
+                nAlong  = self.longitude.shape[0]
+                nAcross = self.longitude.shape[1]
+            else:
+                nAlong  = len(lat)
+                nAcross = len(lon)
+            print( '0 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
+
+            print( 'd1 ds.data.shape:  '+str(ds[:].astype(np.double).shape))
+            print( 'd2 ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
+            print( 'd3 ds.data.shape:  '+str(ds[:,:,:].astype(np.double).shape))
+
+            if len(ds.shape) == 2:
+                nZ = 1
+                data = np.zeros((nAlong,nAcross))
+                data[0:nAlong,0:nAcross] = ds[0:nAlong,0:nAcross].astype(np.double)
+            else: # TODO Assume 3 for now fix later.
+                nZ = ds.shape[2]
+                data = np.zeros((nAlong,nAcross,nZ))
+                data[0:nAlong,0:nAcross,0:nZ] = ds[0:nAlong,0:nAcross,:].astype(np.double)
+
+            print( 'a data.shape:     '+str(data.shape))
+            print(' a nZ:             '+str(nZ))
+            self.slice_size = nAlong*nAcross
+
+            print( '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
+            print( '2 data.shape:     '+str(data.shape))
+        
+            # attrs        = ds.attributes(full=1)
+            attrs        = ds.attrs
+            print('ds.attrs: ',ds.attrs)
+            aoa          = attrs["Offset"]
+            add_offset   = aoa[0]
+            fva          = attrs["_FillValue"]
+            _FillValue   = fva[0]
+            sfa          = attrs["ScaleFactor"]
+            scale_factor = sfa[0]
+            
+            print( 'aoa: ',aoa)
+            print( 'fva: ',fva)
+            print( 'sfa: ',sfa)
+
+            ua           = attrs[self.key_units]
+            self.units        = ua[0]
+            print( 'ua:  ',ua)
+
+            print( '0 mnmx(data): ',np.nanmin(data),np.nanmax(data))
+            invalid = None
+            if "HDFEOS/SWATHS/O3Profile/Data Fields/O3" != self.datafieldname:
+                vra          = attrs["ValidRange"]
+                valid_min    = vra[0]
+                valid_max    = vra[1]
+                print( 'vra: ',vra)
+
+                invalid = np.logical_or(data > valid_max, data < valid_min)
+                invalid = np.logical_or(invalid,data == _FillValue)
+
+            else:
+                invalid = np.where(data == _FillValue)
+                # invalid = np.logical_or(True???,data == _FillValue)
+
+            if invalid is not None:
+                data[invalid] = np.nan
+            print( '1 mnmx(data): ',np.nanmin(data),np.nanmax(data))
+
+            # Not sure about the following. Cribbed from MODIS approach.
+            data = (data - add_offset) * scale_factor
+            self.data = np.ma.masked_array(data, np.isnan(data))
+            print( '2 mnmx(self.data): ',np.nanmin(self.data),np.nanmax(self.data))
+            
 
     def init_viz(self\
                      ,figax=None
