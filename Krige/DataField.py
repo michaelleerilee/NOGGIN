@@ -461,14 +461,15 @@ custom_loader=None.  A callable(self) that allows a user to write a
             if self.datafilename[3:5] == '02':
                 self.load_VNP02()
             else:
-                failed_to_load_message()
-        if self.datafilename[0:3] in ["MOD","MYD"]:
+                self.failed_to_load_message()
+                return
+        elif self.datafilename[0:3] in ["MOD","MYD"]:
             if self.datafilename[3:5] == '05':
                 self.load05()
             elif self.datafilename[3:5] == '08':
                 self.load08()
             else:
-                failed_to_load_message()
+                self.failed_to_load_message()
                 return
         elif self.datafilename[0:3] in ["OMI"]:
             # How did OMI get in a MODIS object?
@@ -477,10 +478,10 @@ custom_loader=None.  A callable(self) that allows a user to write a
             elif "L2" in self.datafilename:
                 self.loadOMI_L2()
             else:
-                failed_to_load_message()
+                self.failed_to_load_message()
                 return
         else:
-            failed_to_load_message()
+            self.failed_to_load_message()
 
     def load05(self):
         hdf = SD(self.srcdirname+self.datafilename, SDC.READ)
@@ -729,7 +730,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
             ds  = hdf[self.datafieldname]
 
             # print 'hdf.keys: ',hdf.keys()
-            print( 'ds.attrs.keys: ',ds.attrs.keys())
+            # print( 'ds.attrs.keys: ',ds.attrs.keys())
 
             # long_name="Atmospheric_Water_Vapor_Mean"
             ### TODO Maybe these do not need to be fields, just local vars
@@ -852,20 +853,41 @@ custom_loader=None.  A callable(self) that allows a user to write a
             else:
                 ds_geo = Dataset(self.srcdirname+self.geofile)
 
-            print('ds:     ',ds.variables)
-            print('ds_geo: ',ds_geo.variables)
+            # _ = [ print(i) for i in ds.__dict__.keys() ]
 
-            lats = ds_geo['geolocation_data/latitude']
-            lons = ds_geo['geolocation_data/longitude']
-            data = ds['observation_data/I04']
+            # TODO - Don't assume the shape of the geolocationa arrays
+            nAlong,nAcross=ds_geo['geolocation_data/latitude'].shape
+            self.latitude = np.zeros((nAlong,nAcross),dtype=np.double)
+            self.longitude = np.zeros((nAlong,nAcross),dtype=np.double)
+            self.latitude[:,:]  = ds_geo['geolocation_data/latitude'][:,:]
+            self.longitude[:,:] = ds_geo['geolocation_data/longitude'][:,:]
 
+            data_shape   = ds['observation_data/I04'].shape
+            scale_factor = ds['observation_data/I04'].scale_factor
+            add_offset   = ds['observation_data/I04'].add_offset
+            _fill_value  = ds['observation_data/I04']._FillValue
+            valid_max    = ds['observation_data/I04'].valid_max
+            valid_min    = ds['observation_data/I04'].valid_min
 
-            exit()
+            if len(data_shape) == 2:
+                nZ = 1
+                _data = np.zeros((nAlong,nAcross),dtype=ds['observation_data/I04'][0,0].dtype)
+                _data[0:nAlong,0:nAcross] = ds['observation_data/I04'][0:nAlong,0:nAcross]
+            else: # TODO Assume 3 for now fix later.
+                nZ = ds.shape[2]
+                _data = np.zeros((nAlong,nAcross,nZ),dtype=ds['observation_data/I04'][0,0].dtype)
+                _data[0:nAlong,0:nAcross,0:nZ] = ds[0:nAlong,0:nAcross,:]
+
+            data = np.zeros(_data.shape,dtype=np.double)
+            invalid = np.where(_data > valid_max)
+            data[:]=(_data[:].astype(np.double) - add_offset) * scale_factor;
+            data[invalid] = np.nan
+            self.data = np.ma.masked_array(data,np.isnan(data))
+
+            # print( 'I04: ',type( ds['observation_data/I04'] ),  ds['observation_data/I04'].shape )
             
-            ds  = hdf[self.datafieldname]
-
             # print 'hdf.keys: ',hdf.keys()
-            print( 'ds.attrs.keys: ',ds.attrs.keys())
+            # print( 'ds.attrs.keys: ',ds.attrs.keys())
 
             # long_name="Atmospheric_Water_Vapor_Mean"
             ### TODO Maybe these do not need to be fields, just local vars
@@ -877,97 +899,20 @@ custom_loader=None.  A callable(self) that allows a user to write a
             self.colormesh_title = self.datafilename
             self.key_units = 'Units'
 
-            lat = hdf['HDFEOS/SWATHS/O3Profile/Geolocation Fields/Latitude']
-            lon = hdf['HDFEOS/SWATHS/O3Profile/Geolocation Fields/Longitude']
-
-            print( 'type(lon): '+str(type(lon)))
-            print( 'type(lat): '+str(type(lat)))
-            print( 'lon.shape: '+str(lon[:].shape))
-            print( 'lat.shape: '+str(lat[:].shape))
-            
-            # self.longitude,self.latitude = np.meshgrid(lon[:],lat[:]) # for grids...
-            self.longitude = np.zeros(lon.shape,dtype=lon.dtype)
-            self.longitude[:] = lon[:]
-            
-            self.latitude  = np.zeros(lat.shape,dtype=lat.dtype)
-            self.latitude[:]  = lat[:]
-            
             self.bbox = box_covering(self.longitude,self.latitude\
                                      ,hack_branchcut_threshold=self.hack_branchcut_threshold\
             )
             print( 'longitude.shape: ',self.longitude.shape)
             print( 'latitude.shape:  ',self.latitude.shape)
-
-            if len(self.longitude.shape) == 2:
-                nAlong  = self.longitude.shape[0]
-                nAcross = self.longitude.shape[1]
-            else:
-                nAlong  = len(lat)
-                nAcross = len(lon)
-            print( '0 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
-
-            print( 'd1 ds.data.shape:  '+str(ds[:].astype(np.double).shape))
-            print( 'd2 ds.data.shape:  '+str(ds[:,:].astype(np.double).shape))
-            print( 'd3 ds.data.shape:  '+str(ds[:,:,:].astype(np.double).shape))
-
-            if len(ds.shape) == 2:
-                nZ = 1
-                data = np.zeros((nAlong,nAcross))
-                data[0:nAlong,0:nAcross] = ds[0:nAlong,0:nAcross].astype(np.double)
-            else: # TODO Assume 3 for now fix later.
-                nZ = ds.shape[2]
-                data = np.zeros((nAlong,nAcross,nZ))
-                data[0:nAlong,0:nAcross,0:nZ] = ds[0:nAlong,0:nAcross,:].astype(np.double)
-
-            print( 'a data.shape:     '+str(data.shape))
-            print(' a nZ:             '+str(nZ))
+            print( 'a data.shape:     '+str(self.data.shape))
+            print( 'a nZ:             '+str(nZ))
             self.slice_size = nAlong*nAcross
 
             print( '1 nAlong,nAcross: '+str(nAlong)+', '+str(nAcross))
-            print( '2 data.shape:     '+str(data.shape))
-        
-            # attrs        = ds.attributes(full=1)
-            attrs        = ds.attrs
-            print('ds.attrs: ',ds.attrs)
-            aoa          = attrs["Offset"]
-            add_offset   = aoa[0]
-            fva          = attrs["_FillValue"]
-            _FillValue   = fva[0]
-            sfa          = attrs["ScaleFactor"]
-            scale_factor = sfa[0]
-            
-            print( 'aoa: ',aoa)
-            print( 'fva: ',fva)
-            print( 'sfa: ',sfa)
+            print( '2 data.shape:     '+str(self.data.shape))
 
-            ua           = attrs[self.key_units]
-            self.units        = ua[0]
-            print( 'ua:  ',ua)
-
-            print( '0 mnmx(data): ',np.nanmin(data),np.nanmax(data))
-            invalid = None
-            if "HDFEOS/SWATHS/O3Profile/Data Fields/O3" != self.datafieldname:
-                vra          = attrs["ValidRange"]
-                valid_min    = vra[0]
-                valid_max    = vra[1]
-                print( 'vra: ',vra)
-
-                invalid = np.logical_or(data > valid_max, data < valid_min)
-                invalid = np.logical_or(invalid,data == _FillValue)
-
-            else:
-                invalid = np.where(data == _FillValue)
-                # invalid = np.logical_or(True???,data == _FillValue)
-
-            if invalid is not None:
-                data[invalid] = np.nan
-            print( '1 mnmx(data): ',np.nanmin(data),np.nanmax(data))
-
-            # Not sure about the following. Cribbed from MODIS approach.
-            data = (data - add_offset) * scale_factor
-            self.data = np.ma.masked_array(data, np.isnan(data))
-            print( '2 mnmx(self.data): ',np.nanmin(self.data),np.nanmax(self.data))
-            
+            return
+        # End def load_VNP02
 
     def init_viz(self\
                      ,figax=None
@@ -1060,6 +1005,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
                     ,cmap=None\
                     ,value_map=None\
                     ,edgecolors=None\
+                    ,sample=None\
     ):
 
         if self.figax is None:
@@ -1070,13 +1016,19 @@ custom_loader=None.  A callable(self) that allows a user to write a
         if(np.isnan(vmax)):
             vmax = np.nanmax(self.data)
 
+        size = self.data.size
+        if sample is None:
+            idx = np.arange(size)
+        else:
+            idx = np.random.randint(0,size,int(sample*size))                                     
+
         sc = None
         if value_map is None:
             if cmap is None:
                 sc = self.figax.ax.scatter(
-                    x=self.longitude
-                    ,y=self.latitude
-                    ,c=self.data
+                    x=self.longitude.ravel()[idx]
+                    ,y=self.latitude.ravel()[idx]
+                    ,c=self.data.ravel()[idx]
                     ,transform=ccrs.PlateCarree() ### Just why?
                     ,vmin=vmin,vmax=vmax\
                     ,s=marker_size\
@@ -1084,9 +1036,9 @@ custom_loader=None.  A callable(self) that allows a user to write a
                     )
             else:
                 sc = self.figax.ax.scatter(
-                    x=self.longitude
-                    ,y=self.latitude
-                    ,c=self.data
+                    x=self.longitude.ravel()[idx]
+                    ,y=self.latitude.ravel()[idx]
+                    ,c=self.data.ravel()[idx]
                     ,transform=ccrs.PlateCarree() ### Just why?
                     ,vmin=vmin,vmax=vmax\
                     ,s=marker_size\
@@ -1096,9 +1048,9 @@ custom_loader=None.  A callable(self) that allows a user to write a
         else:
             if cmap is None:
                 sc = self.figax.ax.scatter(
-                    x=self.longitude
-                    ,y=self.latitude\
-                    ,c=value_map(self.data)\
+                    x=self.longitude.ravel()[idx]
+                    ,y=self.latitude.ravel()[idx]\
+                    ,c=value_map(self.data.ravel()[idx])\
                     ,transform=ccrs.PlateCarree() ### Just why?
                     ,vmin=vmin,vmax=vmax\
                     ,s=marker_size\
@@ -1106,9 +1058,9 @@ custom_loader=None.  A callable(self) that allows a user to write a
                     )
             else:
                 sc = self.figax.ax.scatter(
-                    x=self.longitude
-                    ,y=self.latitude\
-                    ,c=value_map(self.data)\
+                    x=self.longitude.ravel()[idx]
+                    ,y=self.latitude.ravel()[idx]\
+                    ,c=value_map(self.data).ravel()[idx]\
                     ,transform=ccrs.PlateCarree() ### Just why?
                     ,vmin=vmin,vmax=vmax\
                     ,s=marker_size\
