@@ -11,12 +11,20 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 # from mpl_toolkits.basemap import Basemap
 
+# Data retrieved from LAADSWEB.
+#
+## The observation data
+### https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/5110/VNP02IMG/2021/182/
+#
+## The Geolocation data
+### https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/5110/VNP03IMG/2021/182/
+
+# /Users/mrilee/Dropbox/data/VIIRS/VNP02IMG.A2021182.0000.001.2021182063427.nc
 # /Users/mrilee/Dropbox/data/VIIRS/VNP03IMG.A2021182.0000.001.2021182063427.nc
 
 datafile="VNP02IMG.A2021182.0000.001.2021182064359.nc"
 geofile ="VNP03IMG.A2021182.0000.001.2021182063427.nc"
 srcdir="/Users/mrilee/Dropbox/data/VIIRS/"
-
 
 if __name__ == "__main__":
     print('hello world')
