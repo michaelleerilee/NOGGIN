@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     # Display results
     # fig_gen = fig_generator(1,1)
-    df.scatterplot(title='vnp02',colorbar=True,marker_size=7,vmin=mn,vmax=mx,sample=0.01)
+    df.scatterplot(title='vnp02',colorbar=True,marker_size=7,vmin=mn,vmax=mx*0.25,sample=0.001)
     plt.show()
 
     
