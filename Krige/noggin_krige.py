@@ -26,7 +26,7 @@ python ~/git/NOGGIN-github/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}
 
 2018-0808 ML Rilee, RSTLLC, mike@rilee.net
 
-Copyright © 2018 Michael Lee Rilee, mike@rilee.net, Rilee Systems Technologies LLC
+Copyright © 2018-2021 Michael Lee Rilee, mike@rilee.net, Rilee Systems Technologies LLC
 
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
@@ -83,6 +83,12 @@ parser.add_argument('-d','--input_directory'\
                     ,type=str\
                     ,required=True\
                     ,help='The directory to search for input files.')
+
+parser.add_argument('-f','--src_file_list'
+                        ,dest='src_file_list'
+                        ,required=False
+                        ,help='File names and associated geolocation file names')
+parser.set_defaults(src_file_list=None)
 
 parser.add_argument('-m','--variogram_model'\
                     ,dest='variogram_model'\
@@ -208,6 +214,7 @@ _save_index = False
 
 SRC_DIRECTORY=args.inputDirectory
 DATAFIELDNAME=args.datafieldname
+SRC_FILE_LIST=args.src_file_list
 
 ###########################################################################
 #
@@ -244,14 +251,33 @@ else:
 ###########################################################################
 # Start with MetaData sketch.
 # Construct bounding box index.
-src_file_list = [f for f in os.listdir(SRC_DIRECTORY)
-                     if (lambda x:
-                             '.hdf' in x
-                             or '.HDF.' in x
-                             or '.he5' in x
-                             or '.h5' in x
-                             or '.nc' in x
-                             )(f)]
+src_file_list = []
+geo_file_list = []
+if SRC_FILE_LIST is None:
+    src_file_list = [f for f in os.listdir(SRC_DIRECTORY)
+                        if (lambda x:
+                                '.hdf' in x
+                                or '.HDF.' in x
+                                or '.he5' in x
+                                or '.h5' in x
+                                or '.nc' in x
+                                )(f)]
+else:
+    with open(SRC_FILE_LIST,'r') as f:
+        while(True):
+            line = f.readline()
+            if not line:
+                break
+            line = line.rstrip()
+            try:
+                src,geo = line.split(' ')
+            except ValueError:
+                src = line
+                geo = ""
+                pass
+            src_file_list.append(src)
+            geo_file_list.append(geo)
+    
 if len(src_file_list) == 0:
     print('noggin_krige: error: no HDF files found in '+SRC_DIRECTORY+', exiting')
     sys.exit(1)
@@ -262,16 +288,23 @@ bb = df.BoundingBox()
 
 if _verbose:
     print('noggin_krige: number of files to load: '+str(len(src_file_list)))
-
+geo_k = 0
 for i in src_file_list:
     if _verbose:
         print('noggin_krige: loading '+str(i)+' from '+str(SRC_DIRECTORY))
+
+    geofile = ""
+    if len(geo_file_list) > 0:
+        geofile = geo_file_list[geo_k]
+        geo_k+=1
+
     modis_obj = df.DataField(\
-                                datafilename=i\
-                                ,datafieldname=DATAFIELDNAME\
-                                ,srcdirname=SRC_DIRECTORY\
-                                ,hack_branchcut_threshold=200\
-                                )
+                                 datafilename=i\
+                                 ,datafieldname=DATAFIELDNAME\
+                                 ,srcdirname=SRC_DIRECTORY\
+                                 ,hack_branchcut_threshold=200\
+                                 ,geofile=geofile\
+                                 )
     bb = bb.union(modis_obj.bbox)
     modis_BoundingBoxes[i]=modis_obj.bbox
     if _save_index:
@@ -604,16 +637,18 @@ for krigeBox in targetBoxes:
                                         src_data[i] = v
                                         # load the data
                                         if _verbose:
-                                            print( 'loading '+i+' from '+SRC_DIRECTORY)
+                                            print( 'main: loading '+i+' from '+SRC_DIRECTORY)
                                             # print 'type(i): '+str(type(i))
                                         modis_obj = df.DataField(\
-                                                                 datafilename=i\
-                                                                 ,datafieldname=DATAFIELDNAME\
-                                                                 ,srcdirname=SRC_DIRECTORY\
-                                                                 ,hack_branchcut_threshold=200\
-                                        )
+                                                                     datafilename=i\
+                                                                     ,datafieldname=DATAFIELDNAME\
+                                                                     ,srcdirname=SRC_DIRECTORY\
+                                                                     ,hack_branchcut_threshold=200\
+                                                                     ,geofile=geofile\
+                                                    )
                                         modis_objs.append(modis_obj)
-    
+
+            print('len(modis_objs): ',len(modis_objs))
             #
             # Get the (slice) sizes, allocate the arrays, and then fill them
             # sizes_modis_objs      = [ m.data.size for m in modis_objs ]
@@ -645,7 +680,7 @@ for krigeBox in targetBoxes:
                     print('extracting data slice: ',islice)
                     data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel_slice(islice)
                 else:
-                    print('exctracting data')
+                    print('extracting data')
                     data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel()
                 i0=i1
 

@@ -460,6 +460,8 @@ custom_loader=None.  A callable(self) that allows a user to write a
         if self.datafilename[0:3] in ["VNP"]:
             if self.datafilename[3:5] == '02':
                 self.load_VNP02()
+            elif self.datafilename[3:5] == '03':
+                raise ValueError('Geolocation File')
             else:
                 self.failed_to_load_message()
                 return
@@ -855,7 +857,7 @@ custom_loader=None.  A callable(self) that allows a user to write a
 
             # _ = [ print(i) for i in ds.__dict__.keys() ]
 
-            # TODO - Don't assume the shape of the geolocationa arrays
+            # TODO - Don't assume the shape of the geolocation arrays
             nAlong,nAcross=ds_geo['geolocation_data/latitude'].shape
             self.latitude = np.zeros((nAlong,nAcross),dtype=np.double)
             self.longitude = np.zeros((nAlong,nAcross),dtype=np.double)
