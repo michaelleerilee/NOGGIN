@@ -9,8 +9,8 @@
 #
 
 #
-export PYTHONPATH=/Users/mrilee/git/NOGGIN-PyKrige:/Users/mrilee/git/NOGGIN
-export NOGGIN_DATA_SRC_DIRECTORY=/Users/mrilee/Remote/Dropbox/data/VIIRS
+export PYTHONPATH=/home/mrilee/git/NOGGIN-PyKrige:/Users/mrilee/git/NOGGIN
+export NOGGIN_DATA_SRC_DIRECTORY=/home/mrilee/data/VIIRS
 
 # Execute the calculation. Krige to a default 1-degree lon-lat grid.
 #
@@ -25,7 +25,7 @@ python ~/git/NOGGIN/Krige/noggin_krige.py \
        -d ${NOGGIN_DATA_SRC_DIRECTORY}/ \
        -n observation_data/l04 \
        -m gamma_rayleigh_nuggetless_variogram_model \
-       -R -b -180 -90 180 90 \
+       -R -b 15 -35 30 -20 \
        -S 1000 \
        -v
 
