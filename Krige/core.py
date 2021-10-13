@@ -122,10 +122,10 @@ def adaptive_index(x0,y0,x,y,npts=100,beta0=200,frac=0.1,distribution='normal',l
         else:
             iter_since_last_change  = 0
         last_idx_size = idx_size
-        # print('adaptive_index iter= '+str(iter)\
-        #       +', idx_size= '+str(idx.size)\
-        #       +', idx_true_size= '+str(idx_size)\
-        #       +', iter_since_change= '+str(iter_since_last_change))
+        print('adaptive_index iter= '+str(iter)\
+              +', idx_size= '+str(idx.size)\
+              +', idx_true_size= '+str(idx_size)\
+              +', iter_since_change= '+str(iter_since_last_change))
         if idx_size >= npts:
             break
         elif iter_since_last_change > 2:

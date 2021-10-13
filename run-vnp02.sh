@@ -8,9 +8,46 @@
 # data structures at a lower level.
 #
 
+usage() {
+    echo
+    echo "$0"
+    echo "  Run noggin_krige over a region of interest. "
+    echo
+    echo "  Bounding box is required."
+    echo
+    echo "Example:"
+    echo "  $0 lon0 lat0 lon1 lat1"
+    echo
+    echo "where (lon0,lat0) and (lon1,lat1) are the lower left"
+    echo "and upper right points of the box in  integer degrees."
+    echo
+    exit
+    }
+
+[[ $# -lt 4 ]] && usage
+
 #
-export PYTHONPATH=/home/mrilee/git/NOGGIN-PyKrige:/Users/mrilee/git/NOGGIN
+export PYTHONPATH=/home/mrilee/git/NOGGIN-PyKrige:/home/mrilee/git/NOGGIN
 export NOGGIN_DATA_SRC_DIRECTORY=/home/mrilee/data/VIIRS
+
+## lon0=+20
+## lat0=-26
+## lon1=+21
+## lat1=-25
+
+lon0=$1
+lat0=$2
+lon1=$3
+lat1=$4
+
+# echo "-b ${lon0} ${lat0} ${lon1} ${lat1}"
+# outfile=`printf "noggin_krige_${lon0}_${lat0}_${lon1}_${lat1}.h5"`
+echo
+echo run-vnp02.h
+echo
+outfile=`printf "noggin_krige_%04d_%04d_%04d_%04d.h5" ${lon0} ${lat0} ${lon1} ${lat1}`
+echo "outfile: ${outfile}"
+# exit 0
 
 # Execute the calculation. Krige to a default 1-degree lon-lat grid.
 #
@@ -23,12 +60,20 @@ export NOGGIN_DATA_SRC_DIRECTORY=/home/mrilee/data/VIIRS
 python ~/git/NOGGIN/Krige/noggin_krige.py \
        -f src_file_list \
        -d ${NOGGIN_DATA_SRC_DIRECTORY}/ \
-       -n observation_data/l04 \
-       -m gamma_rayleigh_nuggetless_variogram_model \
-       -R -b 15 -35 30 -20 \
-       -S 1000 \
-       -v
+       -n observation_data/l05 \
+       -m spherical \
+       -R -b ${lon0} ${lat0} ${lon1} ${lat1} \
+       -r 0.01 \
+       -S 2000 \
+       -l 8 \
+       --lw_scale 2.0 \
+       --Beta 1.5 \
+       -v -x \
+       --output_filename ${outfile}
 
 # Gapfill on a grid
 # python ~/git/NOGGIN/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}/ -n Atmospheric_Water_Vapor_Mean -m gamma_rayleigh_nuggetless_variogram_model -v -G
 
+# Maybe try -m spherical, might be more robust...
+#       -m gamma_rayleigh_nuggetless_variogram_model \
+#       -m spherical \

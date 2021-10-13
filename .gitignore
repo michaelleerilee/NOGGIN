@@ -6,3 +6,5 @@ noggin_krige.hdf
 tmp/
 
 
+log.out
+noggin_krige*.h5

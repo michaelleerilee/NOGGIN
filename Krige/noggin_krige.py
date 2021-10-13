@@ -160,6 +160,18 @@ parser.add_argument('-b','--bounding_box'\
                     ,type=float, nargs=4\
                     ,help='Define a target region of interest, lon0, lat0, lon1, lat1. No effect without --Restrict. NOT TESTED.')
 
+parser.add_argument('-B','--Beta'
+                    ,dest='beta0'
+                    ,type=float, nargs=1
+                    ,help='Variogram scale parameter')
+parser.set_defaults(beta0=1)
+
+parser.add_argument('-L','--lw_scale'
+                    ,dest='lw_scale'
+                    ,type=float, nargs=1
+                    ,help='Fractional scale of target dimensions 0.5*(length,width) to set data input window.')
+parser.set_defaults(lw_scale=2.5)
+
 # parser.add_argument('-S','--SingleTile'\
 #                     ,dest='single_tile'\
 #                     ,action='store_true'\
@@ -235,6 +247,10 @@ _drive_OKrige_backend           = 'vectorized'
 tgt_grid_dLon                   = args.grid_resolution
 tgt_grid_dLat                   = args.grid_resolution
 
+beta0                           = args.beta0[0]
+lw_scale                        = args.lw_scale[0]
+# print('beta0: ',type(lw_scale),lw_scale)
+# exit()
 ###########################################################################
 
 _sampling_fraction              = args.sampling_fraction
@@ -790,11 +806,23 @@ for krigeBox in targetBoxes:
             if _debug:
                 print('noggin_krige:dg,dx,dy,dr: ',dg,dx,dy,dr)
 
-            beta0=1.5*(dr)
-            lw_scale = 2.5
+            beta0=beta0*dr # beta0 set in args
+            # lw_scale set in args
             l=lw_scale*(dx/2)
             w=lw_scale*(dy/2)
 
+#            # OMI
+#            beta0=1.5*(dr) good
+#            lw_scale = 2.5
+#            l=lw_scale*(dx/2)
+#            w=lw_scale*(dy/2)
+#
+#            # VIIRS
+#            beta0=0.04*(dr)
+#            lw_scale = 2.5
+#            l=lw_scale*(dx/2)
+#            w=lw_scale*(dy/2)
+ 
             # e.g. hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
             if k in hires_calc:
                 npts = hires_npts_scale * lores_npts
@@ -1074,17 +1102,17 @@ if True:
     kHDF.save()
     print('noggin_krige: finished saving to HDF')
 
-    # Display results
-    fig_gen = fig_generator(1,1)
-    display_obj = df.DataField(\
-                            data = s\
-                            ,longitude = x\
-                            ,latitude  = y\
-                            )
-#                            ,longitude = tgt_X1d\
-#                            ,latitude  = tgt_Y1d\
-    display_obj.scatterplot(title='s',colorbar=True,marker_size=7)
-    plt.show()
+#     # Display results
+#     fig_gen = fig_generator(1,1)
+#     display_obj = df.DataField(\
+#                             data = s\
+#                             ,longitude = x\
+#                             ,latitude  = y\
+#                             )
+# #                            ,longitude = tgt_X1d\
+# #                            ,latitude  = tgt_Y1d\
+#     display_obj.scatterplot(title='s',colorbar=True,marker_size=7)
+#     plt.show()
 
 print( strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime()))
 end_time = time.time()
