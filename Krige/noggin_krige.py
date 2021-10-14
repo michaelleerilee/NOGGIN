@@ -539,12 +539,23 @@ tgt_lon1 = np.nanmax(tgt_X1d)
 tgt_lat0 = np.nanmin(tgt_Y1d)
 tgt_lat1 = np.nanmax(tgt_Y1d)
 
+if _debug:
+    print('noggin_krige: tgt lon0,lat0: '+str(tgt_lon0)+', '+str(tgt_lat0))
+    print('noggin_krige: tgt lon1,lat1: '+str(tgt_lon1)+', '+str(tgt_lat1))
+    print('tgt_grid_dLon              : '+str(tgt_grid_dLon))
+    print('tgt_grid_dLat              : '+str(tgt_grid_dLat))
+
 nx = (tgt_lon1-tgt_lon0)/tgt_grid_dLon
 ny = (tgt_lat1-tgt_lat0)/tgt_grid_dLat
-if np.abs(nx - int(nx)) > 1.0e-10:
+if np.abs(nx - int(nx)) > 1.0e-8:
     print('Error: grid_dLon does not evenly divide longitude span.')
-if np.abs(ny - int(ny)) > 1.0e-10:
+    print('   nx  = ',nx)
+    print('tgtxsh = ',tgt_X1d.shape)
+    
+if np.abs(ny - int(ny)) > 1.0e-8:
     print('Error: grid_dLat does not evenly divide latitude span.')
+    print('   ny = ',ny)
+    print('tgtysh = ',tgt_Y1d.shape)
 
 ###########################################################################
 

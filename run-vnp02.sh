@@ -43,7 +43,7 @@ lat1=$4
 # echo "-b ${lon0} ${lat0} ${lon1} ${lat1}"
 # outfile=`printf "noggin_krige_${lon0}_${lat0}_${lon1}_${lat1}.h5"`
 echo
-echo run-vnp02.h
+echo run-vnp02.h $1 $2 $3 $4
 echo
 outfile=`printf "noggin_krige_%04d_%04d_%04d_%04d.h5" ${lon0} ${lat0} ${lon1} ${lat1}`
 echo "outfile: ${outfile}"
@@ -63,13 +63,19 @@ python ~/git/NOGGIN/Krige/noggin_krige.py \
        -n observation_data/l05 \
        -m spherical \
        -R -b ${lon0} ${lat0} ${lon1} ${lat1} \
-       -r 0.01 \
+       -r 0.02 \
        -S 2000 \
        -l 8 \
-       --lw_scale 2.0 \
+       --lw_scale 1.75 \
        --Beta 1.5 \
        -v -x \
        --output_filename ${outfile}
+
+# Betas...
+#
+
+# lw_scale
+#
 
 # Gapfill on a grid
 # python ~/git/NOGGIN/Krige/noggin_krige.py -d ${NOGGIN_DATA_SRC_DIRECTORY}/ -n Atmospheric_Water_Vapor_Mean -m gamma_rayleigh_nuggetless_variogram_model -v -G

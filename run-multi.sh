@@ -1,10 +1,10 @@
 #!/bin/bash
 
 lonA=19
-lonB=20
+lonB=22
 
 latA=-27
-latB=-26
+latB=80
 
 dlon=1
 dlat=1
