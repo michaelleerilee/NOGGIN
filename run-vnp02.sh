@@ -16,7 +16,7 @@ usage() {
     echo "  Bounding box is required."
     echo
     echo "Example:"
-    echo "  $0 lon0 lat0 lon1 lat1"
+    echo "  $0 lon0 lat0 lon1 lat1 resolution"
     echo
     echo "where (lon0,lat0) and (lon1,lat1) are the lower left"
     echo "and upper right points of the box in  integer degrees."
@@ -24,7 +24,7 @@ usage() {
     exit
     }
 
-[[ $# -lt 4 ]] && usage
+[[ $# -lt 5 ]] && usage
 
 #
 export PYTHONPATH=/home/mrilee/git/NOGGIN-PyKrige:/home/mrilee/git/NOGGIN
@@ -39,11 +39,12 @@ lon0=$1
 lat0=$2
 lon1=$3
 lat1=$4
+resolution=$5
 
 # echo "-b ${lon0} ${lat0} ${lon1} ${lat1}"
 # outfile=`printf "noggin_krige_${lon0}_${lat0}_${lon1}_${lat1}.h5"`
 echo
-echo run-vnp02.h $1 $2 $3 $4
+echo run-vnp02.h $1 $2 $3 $4 $5
 echo
 outfile=`printf "noggin_krige_%04d_%04d_%04d_%04d.h5" ${lon0} ${lat0} ${lon1} ${lat1}`
 echo "outfile: ${outfile}"
@@ -56,6 +57,7 @@ echo "outfile: ${outfile}"
 # -n <variable to extract>  # Note the low-level style of access via HDF-5
 # -m <variogram functional model>
 # -v # Verbose output
+# -l <number of lags in variogram fit>
 #
 python ~/git/NOGGIN/Krige/noggin_krige.py \
        -f src_file_list \
@@ -63,16 +65,16 @@ python ~/git/NOGGIN/Krige/noggin_krige.py \
        -n observation_data/l05 \
        -m spherical \
        -R -b ${lon0} ${lat0} ${lon1} ${lat1} \
-       -r 0.02 \
+       -r ${resolution} \
        -S 2000 \
-       -l 8 \
+       -l 6 \
        --lw_scale 1.75 \
-       --Beta 1.5 \
+       --Beta 1.75 \
        -v -x \
        --output_filename ${outfile}
 
 # Betas...
-#
+# 1.5 lots of divergences
 
 # lw_scale
 #

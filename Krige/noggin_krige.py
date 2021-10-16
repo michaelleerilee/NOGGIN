@@ -372,7 +372,8 @@ hires_calc = []
 npts_increase_flag = True
 # npts_last_kr_s = 0
 # max_iter_start = 5
-max_iter_start = 8
+# max_iter_start = 8
+max_iter_start = 3
 k = -1
 
 divergence_threshold = 1.5
