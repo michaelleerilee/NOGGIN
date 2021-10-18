@@ -44,7 +44,7 @@ resolution=$5
 # echo "-b ${lon0} ${lat0} ${lon1} ${lat1}"
 # outfile=`printf "noggin_krige_${lon0}_${lat0}_${lon1}_${lat1}.h5"`
 echo
-echo run-vnp02.h $1 $2 $3 $4 $5
+echo run-vnp02.sh $1 $2 $3 $4 $5
 echo
 outfile=`printf "noggin_krige_%04d_%04d_%04d_%04d.h5" ${lon0} ${lat0} ${lon1} ${lat1}`
 echo "outfile: ${outfile}"
@@ -67,9 +67,9 @@ python ~/git/NOGGIN/Krige/noggin_krige.py \
        -R -b ${lon0} ${lat0} ${lon1} ${lat1} \
        -r ${resolution} \
        -S 2000 \
-       -l 6 \
-       --lw_scale 1.75 \
-       --Beta 1.75 \
+       -l 4 \
+       --lw_scale 2 \
+       --Beta 3.0 \
        -v -x \
        --output_filename ${outfile}
 

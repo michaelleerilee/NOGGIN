@@ -688,284 +688,291 @@ for krigeBox in targetBoxes:
 
             if _verbose:
                 print('noggin_krige.py: total number of data points loaded: '+str(total_size_modis_objs))
+
+            cycle=total_size_modis_objs == 0
+            if cycle:
+                print('total_size_modis_objs == 0, cycling')
+            else:
+                data      = np.zeros(total_size_modis_objs)
+                latitude  = np.zeros(total_size_modis_objs)
+                longitude = np.zeros(total_size_modis_objs)
     
-            data      = np.zeros(total_size_modis_objs)
-            latitude  = np.zeros(total_size_modis_objs)
-            longitude = np.zeros(total_size_modis_objs)
-
-            print("len(modis_objs[i].data.shape)",len(modis_objs[0].data.shape))
-            # exit()
- 
-            # TODO Set islice via CL parameter
-            # islice = 0
-            islice = 9
-            i0=0
-            for i in range(len(sizes_modis_objs)):
-                i1 = i0 + sizes_modis_objs[i]
-                if _verbose:
-                    print('adding indexes: ', i0, i1)
-                if len(modis_objs[i].data.shape) == 3:
-                    print('extracting data slice: ',islice)
-                    data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel_slice(islice)
-                else:
-                    print('extracting data')
-                    data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel()
-                i0=i1
-
-            # # The data have been loaded. You can search for duplicates now.
-            # if False:
-            #     dup_lons = [ lon for lon,count in Counter(longitude).iteritems() if count > 1 ]
-            #     if len(dup_lons) > 0:
-            #         dup_lats = [ lat for lat,count in Counter(latitude).iteritems() if count > 1 ]
-            #         if len(dup_lats) > 0:
-            #             dup_lons_idx     = np.where(np.in1d(longitude,dup_lons)); # dup_lons_idx.sort()
-            #             dup_lats_idx     = np.where(np.in1d(latitude, dup_lats)); # dup_lats_idx.sort()
-            #             dup_lonlats_idx  = np.where(np.in1d(dup_lons_idx,dup_lats_idx))
-            #             dups_idx = dup_lons_idx[dup_lonlats_idx]:
-            #             for ii = range(len(dups_idx)):
-            #                 ln0 = longitude[dups_idx[ii]]
-            #                 lt0 = latitude [dups_idx[ii]]
-            #                 for jj = range(1,len(dups_idx)):
-            #                     
-            #                 
-            #                 sum = 0
-            #                 n   = 0
-            #                 for dupi in dup_lons_idx[dup_lonlats_idx]:
-                            
-            #
-            if not args.gap_fill:
-                idx_source = np.where(~np.isnan(data))
-            else:
-                idx_source = np.where( ~np.isnan(data)\
-                                      & (latitude > lat0) \
-                                      & (latitude < lat1) \
-                                      & (longitude > lon0) \
-                                      & (longitude < lon1))
-                idx_target = np.where(  np.isnan(data)\
-                                      & (latitude > lat0) \
-                                      & (latitude < lat1) \
-                                      & (longitude > lon0) \
-                                      & (longitude < lon1))
-
-            longitude_tmp = longitude[idx_source]
-            latitude_tmp  = latitude[idx_source]
-            data_tmp      = data[idx_source]
-
-            #### Average over duplicates... Experimental...
-            ulonlat, ulonlat_ind_fwd, ulonlat_ind, ulonlat_count = unique_columns2(np.vstack((longitude_tmp,latitude_tmp)))
-            if np.nanmax(ulonlat_count) > 1:
-                print('noggin_krige: found at least one duplicate!')
-                longitude_tmp1 = ulonlat[0]
-                latitude_tmp1  = ulonlat[1]
-                data_tmp1 = np.zeros(longitude_tmp1.shape[0])
-                for i in range(ulonlat_ind.size):
-                    data_tmp1[ulonlat_ind[i]] += data_tmp[i]/ulonlat_count[ulonlat_ind[i]]
-            else:
-                longitude_tmp1 = longitude_tmp
-                latitude_tmp1  = latitude_tmp
-                data_tmp1      = data_tmp
-
-            #### And the poles
-            longitude_mask = np.arange(longitude_tmp1.shape[0])
-            longitude_mask[np.where(latitude_tmp1 == -90)] = -1000
-            longitude_mask[np.where(latitude_tmp1 ==  90)] = -2000
-            ulonlat, ulonlat_ind_fwd,ulonlat_ind, ulonlat_count = unique_columns2(np.vstack((longitude_mask,latitude_tmp1)))
-            #??? ulonlat, ulonlat_ind, ulonlat_count = unique_columns2(latitude_tmp1)???
-            if _verbose:
-                print('noggin_krige: np.nanmax(ulonlat_count): '+str(np.nanmax(ulonlat_count)))
-                print(' where == -90: '+str(len(np.where(latitude_tmp1 == -90))))
-                print(' where == 90: '+str(len(np.where(latitude_tmp1 ==  90))))
-            if np.nanmax(ulonlat_count) > 1:
-                print('noggin_krige: found at least one duplicate at a pole!')
-                latitude1  = ulonlat[1]
-                longitude1 = longitude_tmp1[ulonlat_ind_fwd]
-                data1 = np.zeros(longitude1.shape[0])
-                for i in range(ulonlat_ind.size):
-                    data1[ulonlat_ind[i]] += data_tmp1[i]/ulonlat_count[ulonlat_ind[i]]
-            else:
-                longitude1 = longitude_tmp1
-                latitude1  = latitude_tmp1
-                data1      = data_tmp1
-                
-            #### See start of loop... grid = targetTiles[k]
-            gridx,gridy = grid.gridxy()
-
-            # TODO Fix hijacking of the gridx & gridy
-            if args.gap_fill:
-                gridx  = longitude[idx_target]
-                gridy  = latitude [idx_target]
-
-            # TODO This partis to flag and avoid dry firing.
-            in_grid = grid.in_grid(longitude1,latitude1,border=[dSearchLon,dSearchLat])
-            # ex_grid = grid.ex_grid(longitude1,latitude1)
-            if _debug:
-                print('len(in_grid): '+str(len(in_grid)))
-                print('in_grid: '+str(in_grid))
-            if(len(in_grid[0]) == 0):
-                print('noggin_krige: len(in_grid[0]) == 0), no source data. continuing')
-                continue
-            data_mx_in_grid = np.nanmax(data1[in_grid])
-        
-            # Calculate variogram
-    
-            nlags=_drive_OKrige_nlags
-            #
-            dg = gridx.size
-            dx = max(Krige.span_array(gridx),dSearchLon)
-            dy = max(Krige.span_array(gridy),dSearchLat)
-            dr = math.sqrt(dx*dx+dy*dy)
-
-            if _debug:
-                print('noggin_krige:dg,dx,dy,dr: ',dg,dx,dy,dr)
-
-            beta0=beta0*dr # beta0 set in args
-            # lw_scale set in args
-            l=lw_scale*(dx/2)
-            w=lw_scale*(dy/2)
-
-#            # OMI
-#            beta0=1.5*(dr) good
-#            lw_scale = 2.5
-#            l=lw_scale*(dx/2)
-#            w=lw_scale*(dy/2)
-#
-#            # VIIRS
-#            beta0=0.04*(dr)
-#            lw_scale = 2.5
-#            l=lw_scale*(dx/2)
-#            w=lw_scale*(dy/2)
- 
-            # e.g. hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
-            if k in hires_calc:
-                npts = hires_npts_scale * lores_npts
-            else:
-                npts = lores_npts
-
-            if _verbose:
-                print( 'npts( '+str(k)+' ) = '+str(npts))
-            
-            marker_size = 3.5
-            m_alpha = 1.0
-            colormap_0 = plt.cm.rainbow
-            colormap_1 = plt.cm.gist_yarg
-            colormap_2 = plt.cm.plasma
-            colormap_x = colormap_0
-
-            #####
-            
-            inf_detected = False
-            max_iter = max_iter_start
-            npts_in = npts
-            npts_increase_flag = True
-            npts_last_kr_s     = 0
-
-            ####
-            if concatenate_data:
-                if lon_save is None:
-                    lon_save = longitude1.copy()
-                    lat_save = latitude1.copy()
-                    dat_save = data1.copy()
-                else:
-                    print('lon_s shape: ',lon_save.shape)
-                    print('lon_s type:  ',type(lon_save))
-                    print('lon_s dtype: ',lon_save.dtype)
-                    print('lon_1 shape: ',longitude1.shape)                    
-                    lon_save = np.concatenate((lon_save,longitude1))
-                    lat_save = np.concatenate((lat_save,latitude1))
-                    dat_save = np.concatenate((dat_save,data1))
-            ####
-            
-            while( True ):
-                if _verbose:
-                    print( 'npts_in( '+str(k)+' ) = '+str(npts_in))
-                kr=0
-                kr=Krige.drive_OKrige(\
-                                       grid_stride=dg\
-                                       ,random_permute=True\
-                                       ,x=gridx,y=gridy\
-                                       ,src_x=longitude1\
-                                       ,src_y=latitude1\
-                                       ,src_z=data1\
-                                       ,variogram_model=_drive_OKrige_variogram\
-                                       ,variogram_function=vm.variogram_models[_drive_OKrige_variogram].function\
-                                       ,nlags=_drive_OKrige_nlags\
-                                       ,enable_plotting=_plot_variogram\
-                                       ,enable_statistics=_enable_statistics\
-                                       ,npts=npts_in\
-                                       ,beta0=beta0\
-                                       ,frac=0.0\
-                                       ,l=l,w=w\
-                                       ,weight=_drive_OKrige_weight\
-                                       ,verbose=_drive_OKrige_verbose\
-                                       ,eps=_drive_OKrige_eps\
-                                       ,backend=_drive_OKrige_backend\
-                )
-
-                print('kr.z.shape,strides: ',kr.z.shape,kr.z.strides)
-                print('kr.s.shape,strides: ',kr.s.shape,kr.s.strides)
-                
-                kr.title         = modis_obj.datafilename[0:17]  # TODO Cut up the data filename better
-                kr.zVariableName = modis_obj.datafieldname
-                kr_x_mn = np.nanmin(kr.x)
-                kr_x_mx = np.nanmax(kr.x)
-                kr_y_mn = np.nanmin(kr.y)
-                kr_y_mx = np.nanmax(kr.y)
-                kr_mx = np.nanmax(kr.z)
-                kr_s_mn = np.nanmin(kr.s)
-                kr_s_mx = np.nanmax(kr.s)
-                max_iter = max_iter - 1
-                print( 'noggin_krige: kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid: ',kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid)
-                print( 'noggin_krige: kr mnmx x,y: ',kr_x_mn,kr_x_mx,kr_y_mn,kr_y_mx)
-                if (max_iter < 1) or ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
-                    if (max_iter < 1):
-                        print( '**')
-                        if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
-                            print( '*** max_iter exceeded, continuing to next tile')
-                        else:
-                            print( '*** max_iter exceeded, kriging probably diverged, continuing to next tile')
-                    if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
-                        print( '**')
-                        print( '*** kriging seems to have converged')
-                    break
-                else:
-                    print( '***')
-                    print( '*** kriging diverged, changing npts, iter: ',max_iter_start-1-max_iter)
-
-                    # s_mn should be positive, hopefully small
-                    if np.abs(kr_s_mn) > npts_last_kr_s:
-                        print('kr_s_mn increased, changing npts change direction')
-                        npts_increase_flag = not npts_increase_flag
-                    npts_last_kr_s = np.abs(kr_s_mn)
-                    if npts_increase_flag:
-                        print('increasing npts by '+str(npts_increase_factor))
-                        npts_in = npts_in*npts_increase_factor
+                print("len(modis_objs[i].data.shape)",len(modis_objs[0].data.shape))
+                # exit()
+     
+                # TODO Set islice via CL parameter
+                # islice = 0
+                islice = 9
+                i0=0
+                for i in range(len(sizes_modis_objs)):
+                    i1 = i0 + sizes_modis_objs[i]
+                    if _verbose:
+                        print('adding indexes: ', i0, i1)
+                    if len(modis_objs[i].data.shape) == 3:
+                        print('extracting data slice: ',islice)
+                        data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel_slice(islice)
                     else:
-                        print('decreasing npts by '+str(npts_decrease_factor))
-                        npts_in = npts_in*npts_decrease_factor
-                        
-                    # if np.inf in kr.z:
-                    #     if inf_detected:
-                    #         print( 'inf detected again, increasing npts')
-                    #         npts_in = npts_in*npts_increase_factor
-                    #         inf_detected = False
-                    #     else:
-                    #         print( 'inf detected, reducing npts')
-                    #         npts_in = npts_in*0.75
-                    #         inf_detected = True
-                    # else:
-                    #     print( 'increasing npts')
-                    #     npts_in = npts_in*npts_increase_factor
-                                 
-            kr.config.parent_command = sys.argv
-            kr.config.iteration      = k
-            kr.config.files_loaded   = [obj.datafilename for obj in modis_objs]
-            kr.config.datafieldname  = kr.zVariableName
-            krigeSketch_results.append(kr)
+                        print('extracting data')
+                        data[i0:i1],latitude[i0:i1],longitude[i0:i1] = modis_objs[i].ravel()
+                    i0=i1
+    
+                # # The data have been loaded. You can search for duplicates now.
+                # if False:
+                #     dup_lons = [ lon for lon,count in Counter(longitude).iteritems() if count > 1 ]
+                #     if len(dup_lons) > 0:
+                #         dup_lats = [ lat for lat,count in Counter(latitude).iteritems() if count > 1 ]
+                #         if len(dup_lats) > 0:
+                #             dup_lons_idx     = np.where(np.in1d(longitude,dup_lons)); # dup_lons_idx.sort()
+                #             dup_lats_idx     = np.where(np.in1d(latitude, dup_lats)); # dup_lats_idx.sort()
+                #             dup_lonlats_idx  = np.where(np.in1d(dup_lons_idx,dup_lats_idx))
+                #             dups_idx = dup_lons_idx[dup_lonlats_idx]:
+                #             for ii = range(len(dups_idx)):
+                #                 ln0 = longitude[dups_idx[ii]]
+                #                 lt0 = latitude [dups_idx[ii]]
+                #                 for jj = range(1,len(dups_idx)):
+                #                     
+                #                 
+                #                 sum = 0
+                #                 n   = 0
+                #                 for dupi in dup_lons_idx[dup_lonlats_idx]:
+                                
+                #
+                if not args.gap_fill:
+                    idx_source = np.where(~np.isnan(data))
+                else:
+                    idx_source = np.where( ~np.isnan(data)\
+                                          & (latitude > lat0) \
+                                          & (latitude < lat1) \
+                                          & (longitude > lon0) \
+                                          & (longitude < lon1))
+                    idx_target = np.where(  np.isnan(data)\
+                                          & (latitude > lat0) \
+                                          & (latitude < lat1) \
+                                          & (longitude > lon0) \
+                                          & (longitude < lon1))
+    
+                longitude_tmp = longitude[idx_source]
+                latitude_tmp  = latitude[idx_source]
+                data_tmp      = data[idx_source]
+    
+                #### Average over duplicates... Experimental...
+                ulonlat, ulonlat_ind_fwd, ulonlat_ind, ulonlat_count = unique_columns2(np.vstack((longitude_tmp,latitude_tmp)))
+                if np.nanmax(ulonlat_count) > 1:
+                    print('noggin_krige: found at least one duplicate!')
+                    longitude_tmp1 = ulonlat[0]
+                    latitude_tmp1  = ulonlat[1]
+                    data_tmp1 = np.zeros(longitude_tmp1.shape[0])
+                    for i in range(ulonlat_ind.size):
+                        data_tmp1[ulonlat_ind[i]] += data_tmp[i]/ulonlat_count[ulonlat_ind[i]]
+                else:
+                    longitude_tmp1 = longitude_tmp
+                    latitude_tmp1  = latitude_tmp
+                    data_tmp1      = data_tmp
+    
+                #### And the poles
+                longitude_mask = np.arange(longitude_tmp1.shape[0])
+                longitude_mask[np.where(latitude_tmp1 == -90)] = -1000
+                longitude_mask[np.where(latitude_tmp1 ==  90)] = -2000
+                ulonlat, ulonlat_ind_fwd,ulonlat_ind, ulonlat_count = unique_columns2(np.vstack((longitude_mask,latitude_tmp1)))
+                #??? ulonlat, ulonlat_ind, ulonlat_count = unique_columns2(latitude_tmp1)???
+                if _verbose:
+                    print('noggin_krige: np.nanmax(ulonlat_count): '+str(np.nanmax(ulonlat_count)))
+                    print(' where == -90: '+str(len(np.where(latitude_tmp1 == -90))))
+                    print(' where == 90: '+str(len(np.where(latitude_tmp1 ==  90))))
+                if np.nanmax(ulonlat_count) > 1:
+                    print('noggin_krige: found at least one duplicate at a pole!')
+                    latitude1  = ulonlat[1]
+                    longitude1 = longitude_tmp1[ulonlat_ind_fwd]
+                    data1 = np.zeros(longitude1.shape[0])
+                    for i in range(ulonlat_ind.size):
+                        data1[ulonlat_ind[i]] += data_tmp1[i]/ulonlat_count[ulonlat_ind[i]]
+                else:
+                    longitude1 = longitude_tmp1
+                    latitude1  = latitude_tmp1
+                    data1      = data_tmp1
+                    
+                #### See start of loop... grid = targetTiles[k]
+                gridx,gridy = grid.gridxy()
+    
+                # TODO Fix hijacking of the gridx & gridy
+                if args.gap_fill:
+                    gridx  = longitude[idx_target]
+                    gridy  = latitude [idx_target]
+    
+                # TODO This partis to flag and avoid dry firing.
+                in_grid = grid.in_grid(longitude1,latitude1,border=[dSearchLon,dSearchLat])
+                # ex_grid = grid.ex_grid(longitude1,latitude1)
+                if _debug:
+                    print('len(in_grid): '+str(len(in_grid)))
+                    print('in_grid: '+str(in_grid))
+                if(len(in_grid[0]) == 0):
+                    print('noggin_krige: len(in_grid[0]) == 0), no source data. continuing')
+                    continue
+                data_mx_in_grid = np.nanmax(data1[in_grid])
+            
+                # Calculate variogram
+        
+                nlags=_drive_OKrige_nlags
+                #
+                dg = gridx.size
+                dx = max(Krige.span_array(gridx),dSearchLon)
+                dy = max(Krige.span_array(gridy),dSearchLat)
+                dr = math.sqrt(dx*dx+dy*dy)
+    
+                if _debug:
+                    print('noggin_krige:dg,dx,dy,dr: ',dg,dx,dy,dr)
+    
+                beta0=beta0*dr # beta0 set in args
+                # lw_scale set in args
+                l=lw_scale*(dx/2)
+                w=lw_scale*(dy/2)
+    
+    #            # OMI
+    #            beta0=1.5*(dr) good
+    #            lw_scale = 2.5
+    #            l=lw_scale*(dx/2)
+    #            w=lw_scale*(dy/2)
+    #
+    #            # VIIRS
+    #            beta0=0.04*(dr)
+    #            lw_scale = 2.5
+    #            l=lw_scale*(dx/2)
+    #            w=lw_scale*(dy/2)
+     
+                # e.g. hires_calc = [0,2,5,11,17,20,35,39,49,54,60,71]
+                if k in hires_calc:
+                    npts = hires_npts_scale * lores_npts
+                else:
+                    npts = lores_npts
+    
+                if _verbose:
+                    print( 'npts( '+str(k)+' ) = '+str(npts))
+                
+                marker_size = 3.5
+                m_alpha = 1.0
+                colormap_0 = plt.cm.rainbow
+                colormap_1 = plt.cm.gist_yarg
+                colormap_2 = plt.cm.plasma
+                colormap_x = colormap_0
+    
+                #####
+                
+                inf_detected = False
+                max_iter = max_iter_start
+                npts_in = npts
+                npts_increase_flag = True
+                npts_last_kr_s     = 0
+    
+                ####
+                if concatenate_data:
+                    if lon_save is None:
+                        lon_save = longitude1.copy()
+                        lat_save = latitude1.copy()
+                        dat_save = data1.copy()
+                    else:
+                        print('lon_s shape: ',lon_save.shape)
+                        print('lon_s type:  ',type(lon_save))
+                        print('lon_s dtype: ',lon_save.dtype)
+                        print('lon_1 shape: ',longitude1.shape)                    
+                        lon_save = np.concatenate((lon_save,longitude1))
+                        lat_save = np.concatenate((lat_save,latitude1))
+                        dat_save = np.concatenate((dat_save,data1))
+                ####
+                
+                while( True ):
+                    if _verbose:
+                        print( 'npts_in( '+str(k)+' ) = '+str(npts_in))
+                    kr=0
+                    kr=Krige.drive_OKrige(\
+                                           grid_stride=dg\
+                                           ,random_permute=True\
+                                           ,x=gridx,y=gridy\
+                                           ,src_x=longitude1\
+                                           ,src_y=latitude1\
+                                           ,src_z=data1\
+                                           ,variogram_model=_drive_OKrige_variogram\
+                                           ,variogram_function=vm.variogram_models[_drive_OKrige_variogram].function\
+                                           ,nlags=_drive_OKrige_nlags\
+                                           ,enable_plotting=_plot_variogram\
+                                           ,enable_statistics=_enable_statistics\
+                                           ,npts=npts_in\
+                                           ,beta0=beta0\
+                                           ,frac=0.05\
+                                           ,l=l,w=w\
+                                           ,weight=_drive_OKrige_weight\
+                                           ,verbose=_drive_OKrige_verbose\
+                                           ,eps=_drive_OKrige_eps\
+                                           ,backend=_drive_OKrige_backend\
+                    )
 
-            if _verbose:
-                print( 'k,mnmx(gridz): '+str(k)\
-                    +', ( '+str(np.nanmin(krigeSketch_results[-1].z))\
-                    +', '+str(np.nanmax(krigeSketch_results[-1].z))+' )')
+                    # frac in the above is the frac by which to reduce beta, narrowing the distribution
+                    # Was set frac=0.
+    
+                    print('kr.z.shape,strides: ',kr.z.shape,kr.z.strides)
+                    print('kr.s.shape,strides: ',kr.s.shape,kr.s.strides)
+                    
+                    kr.title         = modis_obj.datafilename[0:17]  # TODO Cut up the data filename better
+                    kr.zVariableName = modis_obj.datafieldname
+                    kr_x_mn = np.nanmin(kr.x)
+                    kr_x_mx = np.nanmax(kr.x)
+                    kr_y_mn = np.nanmin(kr.y)
+                    kr_y_mx = np.nanmax(kr.y)
+                    kr_mx = np.nanmax(kr.z)
+                    kr_s_mn = np.nanmin(kr.s)
+                    kr_s_mx = np.nanmax(kr.s)
+                    max_iter = max_iter - 1
+                    print( 'noggin_krige: kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid: ',kr_s_mn,kr_s_mx,kr_mx,data_mx_in_grid)
+                    print( 'noggin_krige: kr mnmx x,y: ',kr_x_mn,kr_x_mx,kr_y_mn,kr_y_mx)
+                    if (max_iter < 1) or ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
+                        if (max_iter < 1):
+                            print( '**')
+                            if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
+                                print( '*** max_iter exceeded, continuing to next tile')
+                            else:
+                                print( '*** max_iter exceeded, kriging probably diverged, continuing to next tile')
+                        if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
+                            print( '**')
+                            print( '*** kriging seems to have converged')
+                        break
+                    else:
+                        print( '***')
+                        print( '*** kriging diverged, changing npts, iter: ',max_iter_start-1-max_iter)
+    
+                        # s_mn should be positive, hopefully small
+                        if np.abs(kr_s_mn) > npts_last_kr_s:
+                            print('kr_s_mn increased, changing npts change direction')
+                            npts_increase_flag = not npts_increase_flag
+                        npts_last_kr_s = np.abs(kr_s_mn)
+                        if npts_increase_flag:
+                            print('increasing npts by '+str(npts_increase_factor))
+                            npts_in = npts_in*npts_increase_factor
+                        else:
+                            print('decreasing npts by '+str(npts_decrease_factor))
+                            npts_in = npts_in*npts_decrease_factor
+                            
+                        # if np.inf in kr.z:
+                        #     if inf_detected:
+                        #         print( 'inf detected again, increasing npts')
+                        #         npts_in = npts_in*npts_increase_factor
+                        #         inf_detected = False
+                        #     else:
+                        #         print( 'inf detected, reducing npts')
+                        #         npts_in = npts_in*0.75
+                        #         inf_detected = True
+                        # else:
+                        #     print( 'increasing npts')
+                        #     npts_in = npts_in*npts_increase_factor
+                                     
+                kr.config.parent_command = sys.argv
+                kr.config.iteration      = k
+                kr.config.files_loaded   = [obj.datafilename for obj in modis_objs]
+                kr.config.datafieldname  = kr.zVariableName
+                krigeSketch_results.append(kr)
+    
+                if _verbose:
+                    print( 'k,mnmx(gridz): '+str(k)\
+                        +', ( '+str(np.nanmin(krigeSketch_results[-1].z))\
+                        +', '+str(np.nanmax(krigeSketch_results[-1].z))+' )')
     
 
 if _verbose:
@@ -986,145 +993,146 @@ if _verbose:
 #                                                   ,meridians_and_parallels = False\
 # )
 
-# Save an HDF file
-# TODO The following is currently broken
-# TODO Apparently SWATH does not mean irregular.
-if True:
-    print('noggin_krige saving to HDF')
-    # Now, we use tgt_X1d and tgt_Y1d
-    ny = tgt_Y1d.size
-    nx = tgt_X1d.size
-
-    # The following, no.
-    x    = np.zeros((ny,nx)); x.fill(np.nan)
-    y    = np.zeros((ny,nx)); y.fill(np.nan)
-
-    # Yes, the following.
-    z    = np.zeros((ny,nx)); z.fill(np.nan)
-    s    = np.zeros((ny,nx)); s.fill(np.nan)
-    nans = np.zeros((ny,nx)); nans.fill(np.nan)
-
-    # The following is incorrect.
-    i=0
-    for kr in krigeSketch_results:
-        print('mnmx:lon,lat: ['\
-              +str(np.nanmin(kr.x))+', '\
-              +str(np.nanmax(kr.x))+']'\
-              +'['\
-              +str(np.nanmin(kr.y))+', '\
-              +str(np.nanmax(kr.y))+'] '\
-              +'kr.x.size: '+str(kr.x.size)\
-        )
-        i=i+1
-        for k in range(kr.x.size):
-            tgt_x_idx = np.where(np.abs(tgt_X1d - kr.x[k]) < 1.0e-10)
-            tgt_y_idx = np.where(np.abs(tgt_Y1d - kr.y[k]) < 1.0e-10)
-
-            if (len(tgt_x_idx) != 1) or (len(tgt_y_idx) != 1):
-                print('*** tgt_?_idx error. ')
-                print('*** tgt_x_idx = '+str(tgt_x_idx))
-                print('*** tgt_y_idx = '+str(tgt_y_idx))
-                print('*** skipping')
-            else:
-                x[tgt_y_idx[0],tgt_x_idx[0]] = kr.x[k]
-                y[tgt_y_idx[0],tgt_x_idx[0]] = kr.y[k]
-                z[tgt_y_idx[0],tgt_x_idx[0]] = kr.z[k]
-                s[tgt_y_idx[0],tgt_x_idx[0]] = kr.s[k]
-        
-    variable_name   = krigeSketch_results[-1].zVariableName
-
-    # TODO: FIX: As a last-minute kluge put all of the files used into the final config.
-    # TODO: FIX: Copy items over to a special config to add below.
-
-    all_files_used=[]
-    for kr0 in krigeSketch_results:
-        all_files_used = all_files_used + kr0.config.files_loaded
-    krigeSketch_results[-1].config.files_loaded = list(set(all_files_used))
-
-    if _verbose:
-        print('noggin_krige: number of files loaded:     '+str(len(all_files_used)))
-        print('noggin_krige: number of individual files: '+str(len(krigeSketch_results[-1].config.files_loaded)))
-        if False:
-            print('noggin_krige: as json: '+krigeSketch_results[-1].config.as_json())
+if not cycle:
+    # Save an HDF file
+    # TODO The following is currently broken
+    # TODO Apparently SWATH does not mean irregular.
+    if True:
+        print('noggin_krige saving to HDF')
+        # Now, we use tgt_X1d and tgt_Y1d
+        ny = tgt_Y1d.size
+        nx = tgt_X1d.size
     
-    if not args.gap_fill:
-        if concatenate_data:
-            # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
-            kHDF = Krige.krigeHDF(\
-                                krg_name                 = variable_name+'_krg'\
-                                ,krg_units               = modis_obj.units\
-                                ,config                  = krigeSketch_results[-1].config\
-                                ,krg_z                   = z\
-                                ,krg_s                   = s\
-                                ,krg_x                   = tgt_X1d\
-                                ,krg_y                   = tgt_Y1d\
-                                ,src_x                   = lon_save\
-                                ,src_y                   = lat_save\
-                                ,src_z                   = dat_save\
-                                ,src_name                = modis_obj.datafieldname\
-                                ,src_units               = modis_obj.units\
-                                ,orig_name               = modis_obj.datafieldname\
-                                ,orig_units              = modis_obj.units\
-                                ,output_filename         = output_filename\
-                                ,redimension             = False\
-                                ,type_hint               = 'swath'\
+        # The following, no.
+        x    = np.zeros((ny,nx)); x.fill(np.nan)
+        y    = np.zeros((ny,nx)); y.fill(np.nan)
+    
+        # Yes, the following.
+        z    = np.zeros((ny,nx)); z.fill(np.nan)
+        s    = np.zeros((ny,nx)); s.fill(np.nan)
+        nans = np.zeros((ny,nx)); nans.fill(np.nan)
+    
+        # The following is incorrect.
+        i=0
+        for kr in krigeSketch_results:
+            print('mnmx:lon,lat: ['\
+                  +str(np.nanmin(kr.x))+', '\
+                  +str(np.nanmax(kr.x))+']'\
+                  +'['\
+                  +str(np.nanmin(kr.y))+', '\
+                  +str(np.nanmax(kr.y))+'] '\
+                  +'kr.x.size: '+str(kr.x.size)\
             )
+            i=i+1
+            for k in range(kr.x.size):
+                tgt_x_idx = np.where(np.abs(tgt_X1d - kr.x[k]) < 1.0e-10)
+                tgt_y_idx = np.where(np.abs(tgt_Y1d - kr.y[k]) < 1.0e-10)
+    
+                if (len(tgt_x_idx) != 1) or (len(tgt_y_idx) != 1):
+                    print('*** tgt_?_idx error. ')
+                    print('*** tgt_x_idx = '+str(tgt_x_idx))
+                    print('*** tgt_y_idx = '+str(tgt_y_idx))
+                    print('*** skipping')
+                else:
+                    x[tgt_y_idx[0],tgt_x_idx[0]] = kr.x[k]
+                    y[tgt_y_idx[0],tgt_x_idx[0]] = kr.y[k]
+                    z[tgt_y_idx[0],tgt_x_idx[0]] = kr.z[k]
+                    s[tgt_y_idx[0],tgt_x_idx[0]] = kr.s[k]
+            
+        variable_name   = krigeSketch_results[-1].zVariableName
+    
+        # TODO: FIX: As a last-minute kluge put all of the files used into the final config.
+        # TODO: FIX: Copy items over to a special config to add below.
+    
+        all_files_used=[]
+        for kr0 in krigeSketch_results:
+            all_files_used = all_files_used + kr0.config.files_loaded
+        krigeSketch_results[-1].config.files_loaded = list(set(all_files_used))
+    
+        if _verbose:
+            print('noggin_krige: number of files loaded:     '+str(len(all_files_used)))
+            print('noggin_krige: number of individual files: '+str(len(krigeSketch_results[-1].config.files_loaded)))
+            if False:
+                print('noggin_krige: as json: '+krigeSketch_results[-1].config.as_json())
+        
+        if not args.gap_fill:
+            if concatenate_data:
+                # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
+                kHDF = Krige.krigeHDF(\
+                                    krg_name                 = variable_name+'_krg'\
+                                    ,krg_units               = modis_obj.units\
+                                    ,config                  = krigeSketch_results[-1].config\
+                                    ,krg_z                   = z\
+                                    ,krg_s                   = s\
+                                    ,krg_x                   = tgt_X1d\
+                                    ,krg_y                   = tgt_Y1d\
+                                    ,src_x                   = lon_save\
+                                    ,src_y                   = lat_save\
+                                    ,src_z                   = dat_save\
+                                    ,src_name                = modis_obj.datafieldname\
+                                    ,src_units               = modis_obj.units\
+                                    ,orig_name               = modis_obj.datafieldname\
+                                    ,orig_units              = modis_obj.units\
+                                    ,output_filename         = output_filename\
+                                    ,redimension             = False\
+                                    ,type_hint               = 'swath'\
+                )
+            else:
+                # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
+                kHDF = Krige.krigeHDF(\
+                                    krg_name                 = variable_name+'_krg'\
+                                    ,krg_units               = modis_obj.units\
+                                    ,config                  = krigeSketch_results[-1].config\
+                                    ,krg_z                   = z\
+                                    ,krg_s                   = s\
+                                    ,krg_x                   = tgt_X1d\
+                                    ,krg_y                   = tgt_Y1d\
+                                    ,orig_name               = modis_obj.datafieldname\
+                                    ,orig_units              = modis_obj.units\
+                                    ,output_filename         = output_filename\
+                                    ,redimension             = False\
+                                    ,type_hint               = 'grid'\
+                                    )
         else:
             # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
+            #
+            # This should be a Level 3 case.
+            #
+            # For args.gap_fill == True, krg_x == orig_x == modis_obj.longitude == tgt_X1d, except for maybe the shape.
+            # Here, there should only be one source file and one target file.
+            #
             kHDF = Krige.krigeHDF(\
-                                krg_name                 = variable_name+'_krg'\
-                                ,krg_units               = modis_obj.units\
-                                ,config                  = krigeSketch_results[-1].config\
-                                ,krg_z                   = z\
-                                ,krg_s                   = s\
-                                ,krg_x                   = tgt_X1d\
-                                ,krg_y                   = tgt_Y1d\
-                                ,orig_name               = modis_obj.datafieldname\
-                                ,orig_units              = modis_obj.units\
-                                ,output_filename         = output_filename\
-                                ,redimension             = False\
-                                ,type_hint               = 'grid'\
-                                )
-    else:
-        # Note the config below should be improved. Check that the vars are being saved correctly to HDF.
-        #
-        # This should be a Level 3 case.
-        #
-        # For args.gap_fill == True, krg_x == orig_x == modis_obj.longitude == tgt_X1d, except for maybe the shape.
-        # Here, there should only be one source file and one target file.
-        #
-        kHDF = Krige.krigeHDF(\
-                              krg_name                 = variable_name+'_krg'\
-                              ,krg_units               = modis_obj.units\
-                              ,config                  = krigeSketch_results[-1].config\
-                              ,krg_z                   = z\
-                              ,krg_s                   = s\
-                              ,krg_x                   = tgt_X1d\
-                              ,krg_y                   = tgt_Y1d\
-                              ,orig_z                  = modis_obj.data
-                              ,orig_x                  = tgt_X1d\
-                              ,orig_y                  = tgt_Y1d\
-                              ,orig_name               = modis_obj.datafieldname\
-                              ,orig_units              = modis_obj.units\
-                              ,output_filename         = output_filename\
-                              ,redimension             = False\
-                              ,type_hint               = 'grid'\
-        )
-
-    kHDF.save()
-    print('noggin_krige: finished saving to HDF')
-
-#     # Display results
-#     fig_gen = fig_generator(1,1)
-#     display_obj = df.DataField(\
-#                             data = s\
-#                             ,longitude = x\
-#                             ,latitude  = y\
-#                             )
-# #                            ,longitude = tgt_X1d\
-# #                            ,latitude  = tgt_Y1d\
-#     display_obj.scatterplot(title='s',colorbar=True,marker_size=7)
-#     plt.show()
+                                  krg_name                 = variable_name+'_krg'\
+                                  ,krg_units               = modis_obj.units\
+                                  ,config                  = krigeSketch_results[-1].config\
+                                  ,krg_z                   = z\
+                                  ,krg_s                   = s\
+                                  ,krg_x                   = tgt_X1d\
+                                  ,krg_y                   = tgt_Y1d\
+                                  ,orig_z                  = modis_obj.data
+                                  ,orig_x                  = tgt_X1d\
+                                  ,orig_y                  = tgt_Y1d\
+                                  ,orig_name               = modis_obj.datafieldname\
+                                  ,orig_units              = modis_obj.units\
+                                  ,output_filename         = output_filename\
+                                  ,redimension             = False\
+                                  ,type_hint               = 'grid'\
+            )
+    
+        kHDF.save()
+        print('noggin_krige: finished saving to HDF')
+    
+    #     # Display results
+    #     fig_gen = fig_generator(1,1)
+    #     display_obj = df.DataField(\
+    #                             data = s\
+    #                             ,longitude = x\
+    #                             ,latitude  = y\
+    #                             )
+    # #                            ,longitude = tgt_X1d\
+    # #                            ,latitude  = tgt_Y1d\
+    #     display_obj.scatterplot(title='s',colorbar=True,marker_size=7)
+    #     plt.show()
 
 print( strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime()))
 end_time = time.time()
