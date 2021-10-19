@@ -213,8 +213,10 @@ if args.variogram_model is None:
     print('noggin_krige: error: -m --variogram_model must be specified. e.g. "spherical" or "gamma_rayleigh_nuggetless_variogram_model"')
     _flag_error_exit=True
 
-
 output_filename = args.output_filename
+krige_diverged  = False
+krige_converged = False
+
 _verbose = args.verbose
 _debug   = args.debug
 
@@ -929,14 +931,17 @@ for krigeBox in targetBoxes:
                             if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
                                 print( '*** max_iter exceeded, continuing to next tile')
                             else:
+                                krige_diverged=True
                                 print( '*** max_iter exceeded, kriging probably diverged, continuing to next tile')
                         if ((kr_mx < divergence_threshold * data_mx_in_grid) and (kr_s_mn >= 0)):
                             print( '**')
                             print( '*** kriging seems to have converged')
+                            krige_converged=True
                         break
                     else:
                         print( '***')
                         print( '*** kriging diverged, changing npts, iter: ',max_iter_start-1-max_iter)
+                        krige_diverged=True
     
                         # s_mn should be positive, hopefully small
                         if np.abs(kr_s_mn) > npts_last_kr_s:
@@ -967,6 +972,8 @@ for krigeBox in targetBoxes:
                 kr.config.iteration      = k
                 kr.config.files_loaded   = [obj.datafilename for obj in modis_objs]
                 kr.config.datafieldname  = kr.zVariableName
+                kr.config.diverged       = krige_diverged
+                kr.config.converged      = krige_converged
                 krigeSketch_results.append(kr)
     
                 if _verbose:

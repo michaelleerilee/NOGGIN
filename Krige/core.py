@@ -379,7 +379,6 @@ The shape of the orig_? arrays is used to format the datasets written to output 
         self.redimension     = redimension
         self.type_hint       = type_hint
 
-
         if (type_hint=='grid') and (redimension==True):
             raise ValueError('type_hint=grid incompatible with redimension==True')
         
@@ -882,6 +881,8 @@ class krigeConfig(object):
                  ,iteration            = None\
                  ,files_loaded         = None\
                  ,datafieldname        = None\
+                 ,diverged             = None\
+                 ,converged            = None\
     ):
         self.noggin_krige_version = Krige.__version__
         self.pykrige_version      = pykrige.__version__
@@ -903,6 +904,8 @@ class krigeConfig(object):
         self.iteration            = iteration
         self.files_loaded         = files_loaded
         self.datafieldname        = datafieldname
+        self.diverged             = diverged
+        self.converged            = converged
     def as_dict(self):
         return \
             {\
@@ -926,6 +929,8 @@ class krigeConfig(object):
               ,'nlags'     : self.nlags\
               ,'weight'    : self.weight\
               ,'parameters': self.parameters\
+              ,'diverged'  : self.diverged\
+              ,'converged' : self.converged\
              }\
              ,'calculation':\
              {\

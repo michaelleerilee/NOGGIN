@@ -3,7 +3,8 @@
 lonA=19
 lonB=29
 
-latA=-27
+# latA=-27
+latA=-15
 latB=80
 
 dlon=1
