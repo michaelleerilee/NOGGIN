@@ -8,3 +8,6 @@ tmp/
 
 log.out
 noggin_krige*.h5
+\#*
+old/
+\.\#*
