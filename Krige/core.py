@@ -1063,7 +1063,7 @@ The error estimate 'ss' is returned without modification from the OK calculation
         data_y         = src_y[src_idx]
         data_z         = src_z[src_idx]
         if log_calc:
-            with numpy.errstate(divide='ignore'):
+            with np.errstate(divide='ignore'):
                 data_z1    = np.log(data_z)
             data_z1[isneginf(data_z1)] = log_fill
         else:
