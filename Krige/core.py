@@ -1065,7 +1065,7 @@ The error estimate 'ss' is returned without modification from the OK calculation
         if log_calc:
             with np.errstate(divide='ignore'):
                 data_z1    = np.log(data_z)
-            data_z1[isneginf(data_z1)] = log_fill
+            data_z1[np.isneginf(data_z1)] = log_fill
         else:
             data_z1    = np.copy(data_z)
 

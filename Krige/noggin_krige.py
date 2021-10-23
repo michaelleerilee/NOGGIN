@@ -329,7 +329,7 @@ if _read_index:
             p1 = df.Point(lonlat_degrees = v[1]['p1'])
             modis_BoundingBoxes[i] = df.BoundingBox(p=(p0,p1))
             # print('x: ',modis_BoundingBoxes[i])
-            print('i,file,lon_lats: ',i,v[0],modis_BoundingBoxes[i].lons_lats())
+            # print('i,file,lon_lats: ',i,v[0],modis_BoundingBoxes[i].lons_lats())
                   
         # print('modis_BoundingBoxes: type  ',type(modis_BoundingBoxes))
         # print('modis_BoundingBoxes:       ',modis_BoundingBoxes)
