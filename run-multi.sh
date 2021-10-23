@@ -1,12 +1,15 @@
 #!/bin/bash
 
-lonA=-140
-lonB=-120
+lonA=-165
+lonB=-145
 
-# latA=-27
-# latA=-15
-latA=-88
-latB=-68
+# Tropics
+latA=-30
+latB=30
+
+# Near the pole
+# latA=-88
+# latB=-68
 
 dlon=2
 dlat=2

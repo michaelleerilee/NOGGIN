@@ -955,6 +955,7 @@ def drive_OKrige(
         x,y
         ,src_x,src_y,src_z
         ,log_calc=True
+        ,log_fill=-999.0
         ,grid_stride=1
         ,random_permute=False
         ,variogram_model=None
@@ -1062,7 +1063,9 @@ The error estimate 'ss' is returned without modification from the OK calculation
         data_y         = src_y[src_idx]
         data_z         = src_z[src_idx]
         if log_calc:
-            data_z1    = np.log(data_z)
+            with numpy.errstate(divide='ignore'):
+                data_z1    = np.log(data_z)
+            data_z1[isneginf(data_z1)] = log_fill
         else:
             data_z1    = np.copy(data_z)
 

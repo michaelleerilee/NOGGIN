@@ -274,6 +274,8 @@ if _sampling_fraction is None:
 else:
     lores_npts = None
 
+# For json decoding cf. https://stackoverflow.com/questions/6578986/how-to-convert-json-data-into-a-python-object
+#
 def object_decoder(obj):
     if '__type__' in obj and obj['__type__'] == 'User':
         return User(obj['name'], obj['username'])

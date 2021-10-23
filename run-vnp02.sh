@@ -28,7 +28,9 @@ usage() {
 
 #
 export PYTHONPATH=/home/mrilee/git/NOGGIN-PyKrige:/home/mrilee/git/NOGGIN
-export NOGGIN_DATA_SRC_DIRECTORY=/home/mrilee/data/VIIRS
+# export NOGGIN_DATA_SRC_DIRECTORY=/home/mrilee/data/VIIRS
+export NOGGIN_DATA_SRC_DIRECTORY=/media/mrilee/data/VIIRS
+export SRC_FILE_LIST=src_file_list_3
 
 ## lon0=+20
 ## lat0=-26
@@ -60,7 +62,7 @@ echo "outfile: ${outfile}"
 # -l <number of lags in variogram fit>
 #
 python ~/git/NOGGIN/Krige/noggin_krige.py \
-       -f src_file_list \
+       -f ${SRC_FILE_LIST} \
        -d ${NOGGIN_DATA_SRC_DIRECTORY}/ \
        -n observation_data/l05 \
        -m spherical \
