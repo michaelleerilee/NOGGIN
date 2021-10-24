@@ -721,12 +721,16 @@ for krigeBox in targetBoxes:
             src_data   = {}
             modis_objs = []
             # for i,v in boxes.iteritems():
+            once = True
+            max_granules=4
             for i,v in boxes.items():
                 i = str(i)
                 # if i[0:3] in _load_datasets: # Check to see if we're loading something DataField knows about.
                 # TODO Currently loading too much data. Add trimming option to df.DataField. Limit number of modis_obj for now.
-                if len(modis_objs) > 2:
-                    print('Sorry, have too many files to load. Implement df.DataField.trim when possible.')
+                if len(modis_objs) > max_granules:
+                    if once:
+                        print('Sorry, limiting the number of granules being loaded to '+str(max_granules))
+                        once=False
                 else:
                 # if True:
                     lons,lats = v.lons_lats()

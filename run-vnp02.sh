@@ -65,7 +65,7 @@ python ~/git/NOGGIN/Krige/noggin_krige.py \
        -f ${SRC_FILE_LIST} \
        -d ${NOGGIN_DATA_SRC_DIRECTORY}/ \
        -n observation_data/l05 \
-       -m spherical \
+       -m gamma_rayleigh_nuggetless_variogram_model \
        -R -b ${lon0} ${lat0} ${lon1} ${lat1} \
        -r ${resolution} \
        -S 2000 \

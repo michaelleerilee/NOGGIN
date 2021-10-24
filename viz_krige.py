@@ -39,7 +39,7 @@ def main():
     for f in files:
         load_and_plot_khdf(f
                   ,vmin= 1.0e-8
-                  ,vmax= 3.6e-5
+                  ,vmax= 3.0e-5
                   ,rasterized=False
                   )
 
