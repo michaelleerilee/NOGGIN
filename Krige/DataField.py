@@ -929,23 +929,34 @@ custom_loader=None.  A callable(self) that allows a user to write a
                 inbox[i,j]   = searchBox.contains_lonlat(self.longitude[i,j],self.latitude[i,j])
 
         idx        = np.where(inbox)
-        latitude_  = self.latitude[idx]
-        longitude_ = self.longitude[idx]
-        data_      = self.data[idx]
 
-        del self.latitude
-        del self.longitude
-        del self.data
-        del self.bbox
+        if idx[0].size == 0:
+            return False
+        else:
+            latitude_  = self.latitude[idx]
+            longitude_ = self.longitude[idx]
+            data_      = self.data[idx]
 
-        self.latitude  = latitude_
-        self.longitude = longitude_
-        self.data      = data_
-        self.bbox = box_covering(self.longitude,self.latitude\
-                                 ,hack_branchcut_threshold=self.hack_branchcut_threshold\
-                                 )
-        self.slice_size = len(data_)
-        return
+            del self.latitude
+            del self.longitude
+            del self.data
+            del self.bbox
+
+            self.latitude  = latitude_
+            self.longitude = longitude_
+            self.data      = data_
+
+            # print('lat shape: ',self.latitude.shape)
+            # print('lon shape: ',self.longitude.shape)
+            
+            self.bbox = box_covering(self.longitude,self.latitude\
+                                     ,hack_branchcut_threshold=self.hack_branchcut_threshold\
+                                     )
+            # self.slice_size = len(data_)
+            self.slice_size = data_.size
+            
+        return True
+    
     def info(self,txt):
         print('starting info-%s'%txt)
         print('shape: ',self.data.shape)

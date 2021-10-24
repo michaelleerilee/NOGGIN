@@ -52,6 +52,11 @@ outfile=`printf "noggin_krige_%04d_%04d_%04d_%04d.h5" ${lon0} ${lat0} ${lon1} ${
 echo "outfile: ${outfile}"
 # exit 0
 
+if [ -f "${outfile}" ]; then
+    echo "${outfile} exists, exiting"
+    exit 1
+fi
+
 # Execute the calculation. Krige to a default 1-degree lon-lat grid.
 #
 # CLI Options
@@ -89,3 +94,4 @@ python ~/git/NOGGIN/Krige/noggin_krige.py \
 # Maybe try -m spherical, might be more robust...
 #       -m gamma_rayleigh_nuggetless_variogram_model \
 #       -m spherical \
+

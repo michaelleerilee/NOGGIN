@@ -762,9 +762,12 @@ for krigeBox in targetBoxes:
 #                                                                     ,geofile=geofile\
                                                     )
                                         modis_obj.info('100')
-                                        modis_obj.trim_to(searchBox)
+                                        if modis_obj.trim_to(searchBox):
+                                            print('Adding after trim_to for ',i)
+                                            modis_objs.append(modis_obj)
+                                        else:
+                                            print('No overlap after trim_to for ',i,' skipping...')
                                         modis_obj.info('200')
-                                        modis_objs.append(modis_obj)
 
             print('len(modis_objs): ',len(modis_objs))
             #
