@@ -15,6 +15,7 @@ def load_and_plot_khdf(filename,vmin,vmax,rasterized):
         latitude  = hdf['HDFEOS/NOGGIN/KrigeResult2/Data Fields/latitude']
         longitude = hdf['HDFEOS/NOGGIN/KrigeResult2/Data Fields/longitude']
         # plt.scatter(latitude,longitude,c=l05_krg,vmin=vmin,vmax=vmax)
+        print('l05 mnmx: ',np.amin(l05_krg),np.amax(l05_krg))
         plt.contourf(longitude
                      ,latitude
                      ,l05_krg
@@ -38,7 +39,7 @@ def main():
     for f in files:
         load_and_plot_khdf(f
                   ,vmin= 1.0e-8
-                  ,vmax= 1.6e-6
+                  ,vmax= 3.6e-5
                   ,rasterized=False
                   )
 

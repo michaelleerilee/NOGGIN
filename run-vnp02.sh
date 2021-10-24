@@ -71,12 +71,14 @@ python ~/git/NOGGIN/Krige/noggin_krige.py \
        -S 2000 \
        -l 4 \
        --lw_scale 2 \
-       --Beta 3.0 \
+       --Beta 10.0 \
        -v -x \
        --output_filename ${outfile}
 
 # Betas...
+# As beta decreases the sampling distribution narrows.
 # 1.5 lots of divergences
+# 4 long time...
 
 # lw_scale
 #

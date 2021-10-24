@@ -4,7 +4,11 @@ lonA=-165
 lonB=-145
 
 # Tropics
-latA=-30
+# latA=-30
+# latB=30
+
+# Hawaii
+latA=10
 latB=30
 
 # Near the pole

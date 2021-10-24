@@ -787,7 +787,7 @@ def fit_variogram(x,y,z
     self_Z = np.atleast_1d(np.squeeze(np.array(z, copy=True)))
     self_XCENTER = (np.amax(self_X_ORIG) + np.amin(self_X_ORIG))/2.0
     self_YCENTER = (np.amax(self_Y_ORIG) + np.amin(self_Y_ORIG))/2.0
-    
+
     if coordinates_type == 'euclidean':
         # raise NotImplementedError('coordinates_type euclidean NOT IMPLEMENTED.')
         self_anisotropy_scaling = anisotropy_scaling
@@ -838,6 +838,9 @@ def fit_variogram(x,y,z
     #     )
 
     # core._
+
+    if verbose:
+        print('fit variogram 100')
     
     self_lags, self_semivariance, self_variogram_model_parameters = \
         core._initialize_variogram_model(\
@@ -847,6 +850,9 @@ def fit_variogram(x,y,z
                                       ,self_variogram_function, nlags, weight\
                                       ,coordinates_type=coordinates_type\
         )
+
+    if verbose:
+        print('fit variogram 200')
     
 # This only used for euclidean...
 #                                          np.column_stack((self_X_ADJUSTED, self_Y_ADJUSTED))\
@@ -955,7 +961,7 @@ def drive_OKrige(
         x,y
         ,src_x,src_y,src_z
         ,log_calc=True
-        ,log_fill=-999.0
+        ,log_fill=-99.0
         ,grid_stride=1
         ,random_permute=False
         ,variogram_model=None
@@ -1046,6 +1052,7 @@ The error estimate 'ss' is returned without modification from the OK calculation
                   +' of '+str(x.size)\
                   +',  '+str(int(100*float(i)/x.size))\
                   +'% done')
+            print('dok: sampling:       '+str(sampling))
             print('dok: src_x.size:     '+str(src_x.size))
             print('dok: src_idx.size:   '+str(src_idx.size)\
                   +', valid: src_idx[src_idx].size= '+str(src_idx[src_idx].size))

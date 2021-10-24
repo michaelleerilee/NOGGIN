@@ -385,6 +385,9 @@ class BoundingBox(object):
         lon,lat=p.inDegrees()
         return self.lon_interval.contains(lon) and self.lat_interval.contains(lat)
 
+    def contains_lonlat(self,lon,lat):
+        return self.lon_interval.contains(lon) and self.lat_interval.contains(lat)
+
 class DataField(object):
     """Access a datafield in an HDFEOS (was MODIS) file"""
     # TODO Add an object or classes that can handle swath or grid
@@ -914,7 +917,40 @@ custom_loader=None.  A callable(self) that allows a user to write a
             print( '2 data.shape:     '+str(self.data.shape))
 
             return
-        # End def load_VNP02
+    # End def load_VNP02
+
+
+    def trim_to(self,searchBox):
+        "Should trim data to location in searchBox and then reset various other object parameters."
+
+        inbox      = np.full(self.latitude.shape,True,dtype=bool)
+        for i in range(inbox.shape[0]):
+            for j in range(inbox.shape[1]):
+                inbox[i,j]   = searchBox.contains_lonlat(self.longitude[i,j],self.latitude[i,j])
+
+        idx        = np.where(inbox)
+        latitude_  = self.latitude[idx]
+        longitude_ = self.longitude[idx]
+        data_      = self.data[idx]
+
+        del self.latitude
+        del self.longitude
+        del self.data
+        del self.bbox
+
+        self.latitude  = latitude_
+        self.longitude = longitude_
+        self.data      = data_
+        self.bbox = box_covering(self.longitude,self.latitude\
+                                 ,hack_branchcut_threshold=self.hack_branchcut_threshold\
+                                 )
+        self.slice_size = len(data_)
+        return
+    def info(self,txt):
+        print('starting info-%s'%txt)
+        print('shape: ',self.data.shape)
+        print('ending   info-%s'%txt)
+        return
 
     def init_viz(self\
                      ,figax=None

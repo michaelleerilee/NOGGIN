@@ -724,10 +724,14 @@ for krigeBox in targetBoxes:
             for i,v in boxes.items():
                 i = str(i)
                 # if i[0:3] in _load_datasets: # Check to see if we're loading something DataField knows about.
-                if True:
+                # TODO Currently loading too much data. Add trimming option to df.DataField. Limit number of modis_obj for now.
+                if len(modis_objs) > 2:
+                    print('Sorry, have too many files to load. Implement df.DataField.trim when possible.')
+                else:
+                # if True:
                     lons,lats = v.lons_lats()
-                    if _debug:
-                        print('v lons_lats: '+str(lons)+', '+str(lats))
+                    # if _debug:
+                    #    print('v lons_lats: '+str(lons)+', '+str(lats))
                     if (np.nanmax(np.abs(lons)) <= 360.0)\
                        and (np.nanmax(np.abs(lats)) <= 90.0):
                         # o = krigeBox.overlap(v)
@@ -753,6 +757,9 @@ for krigeBox in targetBoxes:
                                                                      ,geofile=geo_file_dict[i]\
 #                                                                     ,geofile=geofile\
                                                     )
+                                        modis_obj.info('100')
+                                        modis_obj.trim_to(searchBox)
+                                        modis_obj.info('200')
                                         modis_objs.append(modis_obj)
 
             print('len(modis_objs): ',len(modis_objs))
