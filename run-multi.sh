@@ -3,8 +3,8 @@
 
 lonA=-179
 lonB=179
-latA=-60
-latB=60
+latA=-89
+latB=89
 
 # lonA=-165
 # lonB=-145
