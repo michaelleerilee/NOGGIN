@@ -7,6 +7,7 @@ tmp/
 
 viz.out
 log.out
+shell.out
 noggin_krige*.h5
 \#*
 old/

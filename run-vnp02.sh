@@ -77,8 +77,8 @@ python ~/git/NOGGIN/Krige/noggin_krige.py \
        -S 2000 \
        -l 4 \
        --lw_scale 2 \
-       --Beta 30.0 \
-       -I 6 \
+       --Beta 50.0 \
+       -I 3 \
        -v -x \
        --output_filename ${outfile}
 

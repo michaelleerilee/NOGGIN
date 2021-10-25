@@ -9,6 +9,7 @@ lonB=-145
 latA=10
 latB=30
 
+- Beta0=30 seems okay, but still diverges at some points
 - Beta0=10 seems to work pretty well. Fairly stable.
 - Beta0=8  caught 2 of the three
 

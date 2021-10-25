@@ -41,7 +41,9 @@ def load_and_plot_khdf(filename,vmin,vmax,rasterized):
                      ,vmin=vmin
                      ,vmax=vmax
                      ,transform=ccrs.PlateCarree()
-                     ,rasterized=rasterized
+#                     ,cmap='Greys'
+#                     ,cmap='gist_rainbow'
+#                     ,rasterized=rasterized
                      )
     return
 
