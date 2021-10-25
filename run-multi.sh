@@ -8,6 +8,8 @@ lonB=-145
 # latB=30
 
 # Hawaii
+lonA=-165
+lonB=-145
 latA=10
 latB=30
 

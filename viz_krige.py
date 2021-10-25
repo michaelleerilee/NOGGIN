@@ -5,8 +5,18 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 
-import h5py as h5    
+import json
+# from types import SimpleNamespace
 
+import h5py as h5
+
+# For json decoding cf. https://stackoverflow.com/questions/6578986/how-to-convert-json-data-into-a-python-object
+#
+def object_decoder(obj):
+    "Decode an object via a hook when reading json."
+    if '__type__' in obj and obj['__type__'] == 'User':
+        return User(obj['name'], obj['username'])
+    return obj
 
 def load_and_plot_khdf(filename,vmin,vmax,rasterized):
     
@@ -14,8 +24,17 @@ def load_and_plot_khdf(filename,vmin,vmax,rasterized):
         l05_krg   = hdf['HDFEOS/NOGGIN/KrigeResult2/Data Fields/l05_krg']
         latitude  = hdf['HDFEOS/NOGGIN/KrigeResult2/Data Fields/latitude']
         longitude = hdf['HDFEOS/NOGGIN/KrigeResult2/Data Fields/longitude']
+        config    = \
+            hdf['HDFEOS/NOGGIN/KrigeResult2/KrigeCalculationConfiguration/configuration.json']
+        config_ = json.loads(config.attrs['json'],object_hook=object_decoder)
+        
         # plt.scatter(latitude,longitude,c=l05_krg,vmin=vmin,vmax=vmax)
-        print('l05 mnmx: ',np.amin(l05_krg),np.amax(l05_krg))
+        print('%s l05 mnmx: %e %e, converged: %s, diverged: %s'%(filename
+                                                                 ,np.amin(l05_krg)
+                                                                 ,np.amax(l05_krg)
+                                                                 ,str(config_['variogram']['converged'])
+                                                                 ,str(config_['variogram']['diverged']),)
+                                                                 )
         plt.contourf(longitude
                      ,latitude
                      ,l05_krg

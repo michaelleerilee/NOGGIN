@@ -1,0 +1,26 @@
+
+* 2021-1024-2042-EDT
+
+** Hawaii
+   
+# Hawaii
+lonA=-165
+lonB=-145
+latA=10
+latB=30
+
+- Beta0=10 seems to work pretty well. Fairly stable.
+- Beta0=8  caught 2 of the three
+
+** run-vnp02.sh -153 10 -151 12 0.05
+
+- Unstable square...
+
+rm noggin_krige_-153_0010_-151_0012.h5
+./run-vnp02.sh -153 10 -151 12 0.05
+
+Converged with a beta of 30?
+
+
+
+  

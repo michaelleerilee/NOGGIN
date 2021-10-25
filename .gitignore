@@ -5,7 +5,7 @@ _test.py
 noggin_krige.hdf
 tmp/
 
-
+viz.out
 log.out
 noggin_krige*.h5
 \#*

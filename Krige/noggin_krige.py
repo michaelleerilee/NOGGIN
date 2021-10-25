@@ -126,6 +126,12 @@ parser.add_argument('-l','--variogram_bin_number'\
 parser.set_defaults(variogram_nlags=8)
 # parser.set_defaults(variogram_nlags=12)
 
+parser.add_argument('-I','--variogram_max_iter'
+                    ,dest='variogram_max_iter'
+                    ,type=int
+                    ,help='The maximum number of iterations allowed to find a variogram.')
+parser.set_defaults(variogram_max_iter=3)
+
 parser.add_argument('-v','--verbose'\
                     ,dest='verbose'\
                     ,action='store_true'\
@@ -273,6 +279,8 @@ if _sampling_fraction is None:
         lores_npts = args.lores_npts
 else:
     lores_npts = None
+
+max_iter_start = args.variogram_max_iter
 
 # For json decoding cf. https://stackoverflow.com/questions/6578986/how-to-convert-json-data-into-a-python-object
 #
@@ -449,9 +457,11 @@ hires_calc = []
 # npts_adapt_flag    = True # 
 npts_increase_flag = True
 # npts_last_kr_s = 0
+
+# max_iter_start is set via args.variogram_max_iter above.
 # max_iter_start = 5
 # max_iter_start = 8
-max_iter_start = 3
+# max_iter_start = 3
 k = -1
 
 divergence_threshold = 1.5

@@ -65,6 +65,7 @@ fi
 # -m <variogram functional model>
 # -v # Verbose output
 # -l <number of lags in variogram fit>
+# -I <number of iterations for varigram fit. default is 3.>
 #
 python ~/git/NOGGIN/Krige/noggin_krige.py \
        -f ${SRC_FILE_LIST} \
@@ -76,7 +77,8 @@ python ~/git/NOGGIN/Krige/noggin_krige.py \
        -S 2000 \
        -l 4 \
        --lw_scale 2 \
-       --Beta 10.0 \
+       --Beta 30.0 \
+       -I 6 \
        -v -x \
        --output_filename ${outfile}
 
