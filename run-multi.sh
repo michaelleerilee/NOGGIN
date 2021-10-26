@@ -23,8 +23,8 @@ latB=90
 # latA=-88
 # latB=-68
 
-dlon=10
-dlat=10
+dlon=20
+dlat=20
 
 resolution=0.25
 
