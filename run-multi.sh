@@ -1,10 +1,13 @@
 #!/bin/bash
 
-
+# Whole planet
 lonA=-180
 lonB=180
 latA=-90
 latB=90
+dlon=15
+dlat=15
+resolution=0.25
 
 # lonA=-165
 # lonB=-145
@@ -23,13 +26,13 @@ latB=90
 # latA=-88
 # latB=-68
 
-dlon=20
-dlat=20
+# dlon=15
+# dlat=15
 
-resolution=0.25
+# resolution=0.25
 
-for lat0 in `seq $latA $dlat $latB`; do
-    for lon0 in `seq $lonA $dlon $lonB`; do
+for lon0 in `seq $lonA $dlon $lonB`; do
+    for lat0 in `seq $latA $dlat $latB`; do
 	# echo $dlon $dlat
 	(( lon1 = lon0 + dlon ))
 	(( lat1 = lat0 + dlat ))

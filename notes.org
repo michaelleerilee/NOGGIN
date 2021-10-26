@@ -1,6 +1,16 @@
 
 * 2021-1024-2042-EDT
 
+** Whole globe
+lonA=-180
+lonB=180
+latA=-90
+latB=90
+dlon=15
+dlat=15
+resolution=0.25
+  
+
 ** Hawaii
    
 # Hawaii

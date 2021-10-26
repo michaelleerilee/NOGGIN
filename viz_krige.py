@@ -38,8 +38,8 @@ def load_and_plot_khdf(filename,vmin,vmax,rasterized):
         plt.contourf(longitude
                      ,latitude
                      ,l05_krg
-                     ,vmin=vmin
-                     ,vmax=vmax
+#                     ,vmin=vmin
+#                     ,vmax=vmax
                      ,transform=ccrs.PlateCarree()
 #                     ,cmap='Greys'
 #                     ,cmap='gist_rainbow'
@@ -60,7 +60,7 @@ def main():
     for f in files:
         load_and_plot_khdf(f
                   ,vmin= 1.0e-10
-                  ,vmax= 1.0e-6
+                  ,vmax= 8.0e-5
                   ,rasterized=False
                   )
 
