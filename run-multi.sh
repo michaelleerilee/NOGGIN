@@ -1,10 +1,10 @@
 #!/bin/bash
 
 
-lonA=-179
-lonB=179
-latA=-89
-latB=89
+lonA=-180
+lonB=180
+latA=-90
+latB=90
 
 # lonA=-165
 # lonB=-145
@@ -23,8 +23,8 @@ latB=89
 # latA=-88
 # latB=-68
 
-dlon=2
-dlat=2
+dlon=10
+dlat=10
 
 resolution=0.25
 
