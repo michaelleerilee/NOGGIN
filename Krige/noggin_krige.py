@@ -64,16 +64,6 @@ import pykrige.variogram_models as vm
 
 ###########################################################################
 
-# https://stackoverflow.com/questions/21888406/getting-the-indexes-to-the-duplicate-columns-of-a-numpy-array
-def unique_columns2(data):
-    dt = np.dtype((np.void, data.dtype.itemsize * data.shape[0]))
-    dataf = np.asfortranarray(data).view(dt)
-    u,uind_fwd,uind,ucounts = np.unique(dataf, return_index=True, return_inverse=True, return_counts=True)
-    u = u.view(data.dtype).reshape(-1,data.shape[0]).T
-    return (u,uind_fwd,uind,ucounts)
-
-###########################################################################
-
 start_time = time.time()
 
 parser = argparse.ArgumentParser(description='Capture krige control parameters.')
@@ -689,7 +679,12 @@ for krigeBox in targetBoxes:
             data_tmp      = data[idx_source]
 
             #### Average over duplicates... Experimental...
-            ulonlat, ulonlat_ind_fwd, ulonlat_ind, ulonlat_count = unique_columns2(np.vstack((longitude_tmp,latitude_tmp)))
+            ulonlat, ulonlat_ind_fwd, ulonlat_ind, ulonlat_count = np.unique(np.vstack((longitude_tmp,latitude_tmp)),
+                                                                             return_index=True,
+                                                                             return_inverse=True,
+                                                                             return_counts=True,
+                                                                             axis=1
+                                                                             )
             if np.nanmax(ulonlat_count) > 1:
                 print('noggin_krige: found at least one duplicate!')
                 longitude_tmp1 = ulonlat[0]
@@ -706,8 +701,13 @@ for krigeBox in targetBoxes:
             longitude_mask = np.arange(longitude_tmp1.shape[0])
             longitude_mask[np.where(latitude_tmp1 == -90)] = -1000
             longitude_mask[np.where(latitude_tmp1 ==  90)] = -2000
-            ulonlat, ulonlat_ind_fwd,ulonlat_ind, ulonlat_count = unique_columns2(np.vstack((longitude_mask,latitude_tmp1)))
-            #??? ulonlat, ulonlat_ind, ulonlat_count = unique_columns2(latitude_tmp1)???
+            ulonlat, ulonlat_ind_fwd, ulonlat_ind, ulonlat_count = np.unique(np.vstack((longitude_mask,latitude_tmp1)),
+                                                                             return_index=True,
+                                                                             return_inverse=True,
+                                                                             return_counts=True,
+                                                                             axis=1
+                                                                             )
+            
             if _verbose:
                 print('noggin_krige: np.nanmax(ulonlat_count): '+str(np.nanmax(ulonlat_count)))
                 print(' where == -90: '+str(len(np.where(latitude_tmp1 == -90))))
